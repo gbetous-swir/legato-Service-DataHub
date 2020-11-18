@@ -147,7 +147,7 @@ LE_SHARED double dataSample_GetTimestamp
  * @warning You had better be sure that this is a Boolean Data Sample.
  */
 //--------------------------------------------------------------------------------------------------
-bool dataSample_GetBoolean
+LE_SHARED bool dataSample_GetBoolean
 (
     dataSample_Ref_t sampleRef
 );
@@ -162,7 +162,7 @@ bool dataSample_GetBoolean
  * @warning You had better be sure that this is a Numeric Data Sample.
  */
 //--------------------------------------------------------------------------------------------------
-double dataSample_GetNumeric
+LE_SHARED double dataSample_GetNumeric
 (
     dataSample_Ref_t sampleRef
 );
@@ -177,7 +177,7 @@ double dataSample_GetNumeric
  * @warning You had better be sure that this is a String Data Sample.
  */
 //--------------------------------------------------------------------------------------------------
-const char* dataSample_GetString
+LE_SHARED const char* dataSample_GetString
 (
     dataSample_Ref_t sampleRef
 );
@@ -192,7 +192,7 @@ const char* dataSample_GetString
  * @warning You had better be sure that this is a JSON Data Sample.
  */
 //--------------------------------------------------------------------------------------------------
-const char* dataSample_GetJson
+LE_SHARED const char* dataSample_GetJson
 (
     dataSample_Ref_t sampleRef
 );

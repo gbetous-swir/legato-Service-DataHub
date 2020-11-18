@@ -26,6 +26,9 @@ requires:
     {
         $CURDIR/../json
         $CURDIR/../jsonFormatter
+#if ${MK_CONFIG_ENABLE_OCTAVE} = y
+        $CURDIR/../octaveFormatter
+#endif
     }
 }
 
@@ -48,6 +51,10 @@ cflags:
 {
     -I$CURDIR/../json
     -I$CURDIR/../jsonFormatter
+#if ${MK_CONFIG_ENABLE_OCTAVE} = y
+    -I$CURDIR/../octaveFormatter
+    -DWITH_OCTAVE
+#endif
 }
 
 #if ${DHUB_POOLS_INC} = ""

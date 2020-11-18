@@ -15,6 +15,10 @@
 #define RES_FLAG_NEW                0x20000000  ///< Node has been created since the last snapshot.
 #define RES_FLAG_DELETED            0x10000000  ///< Node has been deleted since deletions were last
                                                 ///< flushed.
+#define RES_FLAG_CLEAR_NEW          0x08000000  ///< Node with new flag set has been used in current
+                                                ///< snapshot, clear its new flag at the end of it.
+#define RES_FLAG_JSON_EX_CHANGED    0x04000000  ///< Node JSON example value has been changed since
+                                                ///< the last snapshot (only for JSON resources).
 
 // Forward declaration needed by res_Resource_t.entryRef.  See resTree.h
 typedef struct resTree_Entry* resTree_EntryRef_t;
@@ -752,6 +756,28 @@ bool res_IsRelevant
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Set the resource's clear newness flag
+ */
+//--------------------------------------------------------------------------------------------------
+void res_SetClearNewnessFlag
+(
+    res_Resource_t  *resPtr ///< Resource to query.
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Get the resource's "clear newness" flag.
+ *
+ * @return Whether the resource "newness" flag must be cleared at the end of current snapshot
+ */
+//--------------------------------------------------------------------------------------------------
+bool res_IsNewnessClearRequired
+(
+    res_Resource_t  *resPtr ///< Resource to query.
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Mark a resource as no longer "new."  "New" resources are those that were created after the last
  * snapshot scan of the tree.
  */
@@ -838,6 +864,30 @@ dataSample_Ref_t res_FindBufferedSampleAfter
     double startAfter   ///< Start after this many seconds ago, or after an absolute number of
                         ///< seconds since the Epoch (if startafter > 30 years).
                         ///< Use NAN (not a number) to find the oldest.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Get the resource's "JSON example changed" flag.
+ *
+ * @return whether the resource's JSON example was updated after the last scan.
+ */
+//--------------------------------------------------------------------------------------------------
+bool res_IsJsonExampleChanged
+(
+    res_Resource_t* resPtr
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Mark a resource's JSON example as not changed.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ClearJsonExampleChanged
+(
+    res_Resource_t *resPtr ///< Resource to update.
 );
 
 

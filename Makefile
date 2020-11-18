@@ -6,11 +6,16 @@ ifeq ($(D),1)
     DBG := -d $(LEGATO_ROOT)/build/$(TARGET)/debug
 endif
 
+OCTAVE :=
+ifeq ($(O),1)
+    OCTAVE := -C -DWITH_OCTAVE -C -Icomponents/octaveFormatter
+endif
+
 .PHONY: all dataHub appInfoStub sensor actuator snapshot
 all: dataHub appInfoStub sensor actuator snapshot
 
 dataHub:
-	mkapp -t $(TARGET) dataHub.adef -i $(LEGATO_ROOT)/interfaces/supervisor $(DBG)
+	mkapp -t $(TARGET) dataHub.adef -i $(LEGATO_ROOT)/interfaces/supervisor $(DBG) ${OCTAVE}
 
 appInfoStub:
 	mkapp -t $(TARGET) test/appInfoStub.adef -i $(LEGATO_ROOT)/interfaces/supervisor -i $(CURDIR) $(DBG)
@@ -22,7 +27,7 @@ actuator:
 	mkapp -t $(TARGET) test/actuator.adef -i $(PWD) $(DBG)
 
 snapshot:
-	mkapp -t $(TARGET) test/snapshot.adef -i $(PWD) $(DBG)
+	mkapp -t $(TARGET) test/snapshot.adef -i $(PWD) $(DBG) ${OCTAVE}
 
 .PHONY: clean
 clean:

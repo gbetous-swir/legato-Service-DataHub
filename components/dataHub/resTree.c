@@ -1133,6 +1133,21 @@ ssize_t resTree_GetPath
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Get the parent of a given entry.
+ *
+ * @return Reference to the parent entry, or NULL if the entry has no parent (root).
+ */
+//--------------------------------------------------------------------------------------------------
+resTree_EntryRef_t resTree_GetParent
+(
+    resTree_EntryRef_t entryRef ///< Node to get the parent of.
+)
+{
+    return entryRef->parentPtr;
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Get the first child of a given entry, optionally including already deleted nodes if they have not
  * been flushed.
  *
@@ -1999,8 +2014,51 @@ bool resTree_IsRelevant
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Set the node's clear newness flag
+ */
+//--------------------------------------------------------------------------------------------------
+void resTree_SetClearNewnessFlag
+(
+    resTree_EntryRef_t resEntry ///< Resource to update.
+)
+{
+    if (resEntry->type == ADMIN_ENTRY_TYPE_NAMESPACE)
+    {
+        resEntry->u.flags |= RES_FLAG_CLEAR_NEW;
+    }
+    else
+    {
+        res_SetClearNewnessFlag(resEntry->u.resourcePtr);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Get the node's "clear newness" flag.
+ *
+ * @return Whether the node "newness" flag must be cleared at the end of current snapshot
+ */
+//--------------------------------------------------------------------------------------------------
+bool resTree_IsNewnessClearRequired
+(
+    resTree_EntryRef_t resEntry ///< Resource to query.
+)
+{
+    if (resEntry->type == ADMIN_ENTRY_TYPE_NAMESPACE)
+    {
+        return (resEntry->u.flags & RES_FLAG_CLEAR_NEW);
+    }
+    else
+    {
+        return res_IsNewnessClearRequired(resEntry->u.resourcePtr);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Mark a node as no longer "new."  New nodes are those that were created after the last snapshot
  * scan of the tree.
+ * Also remove the "clear newness" flag.
  */
 //--------------------------------------------------------------------------------------------------
 void resTree_ClearNewness
@@ -2011,6 +2069,7 @@ void resTree_ClearNewness
     if (resEntry->type == ADMIN_ENTRY_TYPE_NAMESPACE)
     {
         resEntry->u.flags &= ~RES_FLAG_NEW;
+        resEntry->u.flags &= ~RES_FLAG_CLEAR_NEW;
     }
     else
     {
@@ -2217,6 +2276,42 @@ dataSample_Ref_t resTree_FindBufferedSampleAfter
     LE_ASSERT(obsEntry->u.resourcePtr != NULL);
 
     return res_FindBufferedSampleAfter(obsEntry->u.resourcePtr, startAfter);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Get the resource's "JSON example changed" flag.
+ *
+ * @return whether the resource's JSON example was updated after the last scan.
+ */
+//--------------------------------------------------------------------------------------------------
+bool resTree_IsJsonExampleChanged
+(
+    resTree_EntryRef_t resEntry ///< Resource to poll
+)
+{
+    LE_ASSERT(resEntry->type != ADMIN_ENTRY_TYPE_NAMESPACE);
+    LE_ASSERT(resEntry->u.resourcePtr != NULL);
+
+    return res_IsJsonExampleChanged(resEntry->u.resourcePtr);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Mark a resource's JSON example as not changed.
+ */
+//--------------------------------------------------------------------------------------------------
+void resTree_ClearJsonExampleChanged
+(
+    resTree_EntryRef_t resEntry ///< Resource to update.
+)
+{
+    LE_ASSERT(resEntry->type != ADMIN_ENTRY_TYPE_NAMESPACE);
+    LE_ASSERT(resEntry->u.resourcePtr != NULL);
+
+    res_ClearJsonExampleChanged(resEntry->u.resourcePtr);
 }
 
 

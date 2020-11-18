@@ -116,6 +116,18 @@ LE_SHARED resTree_EntryRef_t snapshot_GetNode
 
 //--------------------------------------------------------------------------------------------------
 /*
+ *  Obtain the resource tree node used as root for snapshot.
+ *
+ *  @return Node reference.
+ */
+//--------------------------------------------------------------------------------------------------
+LE_SHARED resTree_EntryRef_t snapshot_GetRoot
+(
+    void
+);
+
+//--------------------------------------------------------------------------------------------------
+/*
  *  Obtain the time at which the snapshot was initiated.
  *
  *  @return Snapshot time stamp.

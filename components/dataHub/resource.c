@@ -1590,6 +1590,34 @@ bool res_IsRelevant
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Set the resource's clear newness flag
+ */
+//--------------------------------------------------------------------------------------------------
+void res_SetClearNewnessFlag
+(
+    res_Resource_t  *resPtr ///< Resource to query.
+)
+{
+    resPtr->flags |= RES_FLAG_CLEAR_NEW;
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Get the resource's "clear newness" flag.
+ *
+ * @return Whether the resource "newness" flag must be cleared at the end of current snapshot
+ */
+//--------------------------------------------------------------------------------------------------
+bool res_IsNewnessClearRequired
+(
+    res_Resource_t  *resPtr ///< Resource to query.
+)
+{
+    return (resPtr->flags & RES_FLAG_CLEAR_NEW);
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Mark a resource as no longer "new."  "New" resources are those that were created after the last
  * snapshot scan of the tree.
  */
@@ -1600,6 +1628,7 @@ void res_ClearNewness
 )
 {
     resPtr->flags &= ~RES_FLAG_NEW;
+    resPtr->flags &= ~RES_FLAG_CLEAR_NEW;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1724,6 +1753,36 @@ dataSample_Ref_t res_FindBufferedSampleAfter
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Get the resource's "JSON example changed" flag.
+ *
+ * @return whether the resource's JSON example was updated after the last scan.
+ */
+//--------------------------------------------------------------------------------------------------
+bool res_IsJsonExampleChanged
+(
+    res_Resource_t* resPtr
+)
+{
+    return (resPtr->flags & RES_FLAG_JSON_EX_CHANGED);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Mark a resource's JSON example as not changed.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ClearJsonExampleChanged
+(
+    res_Resource_t *resPtr ///< Resource to update.
+)
+{
+    resPtr->flags &= ~RES_FLAG_JSON_EX_CHANGED;
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Set the JSON example value for a given resource.
  */
 //--------------------------------------------------------------------------------------------------
@@ -1740,6 +1799,7 @@ void res_SetJsonExample
     }
 
     resPtr->jsonExample = example;
+    resPtr->flags |= RES_FLAG_JSON_EX_CHANGED;
 
     // Iterate over the list of destination routes, setting their JSON example values.
     le_dls_Link_t* linkPtr = le_dls_Peek(&(resPtr->destList));

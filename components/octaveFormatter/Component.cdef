@@ -1,0 +1,65 @@
+//--------------------------------------------------------------------------------------------------
+/**
+ * Snapshot formatter producing Octave CBOR output.
+ *
+ * Copyright (C) Sierra Wireless Inc.
+ */
+//--------------------------------------------------------------------------------------------------
+
+requires:
+{
+    api:
+    {
+        admin.api   [types-only]
+        io.api      [types-only]
+        query.api   [types-only]
+    }
+}
+
+cflags:
+{
+    -std=c99
+    -I$CURDIR/../dataHub
+
+    //TODO use libcbor legato lib when available
+    -I${OCTAVE_ROOT}/common/cbor
+    -I${OCTAVE_ROOT}/common/cbor
+    -I${OCTAVE_ROOT}/common/cbor/inc
+    -I${OCTAVE_ROOT}/common/cbor/libcbor/src
+    -I${OCTAVE_ROOT}/common/json
+    -I${OCTAVE_ROOT}/common/string
+}
+
+sources:
+{
+    octaveFormatter.c
+
+    //TODO use libcbor legato lib when available
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/common.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/encoding.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/streaming.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/internal/encoders.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/internal/loaders.c
+#if ${LE_CONFIG_RTOS} = y
+#else
+    // compiling these is not required on RTOS but removing them makes linux/FX build fail
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/arrays.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/bytestrings.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/callbacks.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/floats_ctrls.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/ints.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/maps.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/serialization.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/strings.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/tags.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/internal/builder_callbacks.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/internal/memory_utils.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/internal/stack.c
+    ${OCTAVE_ROOT}/common/cbor/libcbor/src/cbor/internal/unicode.c
+#endif
+    ${OCTAVE_ROOT}/common/cbor/cbor_utils.c
+    ${OCTAVE_ROOT}/common/json/json_parser.c
+    ${OCTAVE_ROOT}/common/string/stringUtils.c
+    ${OCTAVE_ROOT}/common/cbor/jsoncbor.c
+}

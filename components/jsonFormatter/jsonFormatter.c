@@ -83,8 +83,17 @@ static int SendData
     count = le_fd_Write(stream, start, jsonFormatter->available);
     if (count < 0)
     {
-        // An error occurred.
-        return -1;
+        if (EAGAIN == errno)
+        {
+            // Data not read yet by other side, keep new data in buffer and wait
+            return 1;
+        }
+        else
+        {
+            // other errors are fatal
+            LE_ERROR("Failed to write to stream with errno: %d", errno);
+            return -1;
+        }
     }
     else if (count < (ssize_t) jsonFormatter->available)
     {
@@ -297,6 +306,10 @@ static void BufferFormatted
     // can assert here.
     LE_ASSERT(0 < result && result <= (int) (sizeof(jsonFormatter->buffer) - offset));
     jsonFormatter->available = result;
+    if (prependComma)
+    {
+        jsonFormatter->available += 1;
+    }
     EnableSend(jsonFormatter);
 }
 
@@ -686,7 +699,9 @@ static void Step
     }
 
     LE_ASSERT(jsonFormatter->nextState > STATE_START && jsonFormatter->nextState < STATE_MAX);
+#if LE_DEBUG_ENABLED
     LE_DEBUG("JSON formatter transition: -> %s", stepNames[jsonFormatter->nextState - 1]);
+#endif /* end LE_DEBUG_ENABLED */
     steps[jsonFormatter->nextState - 1](jsonFormatter);
 }
 
