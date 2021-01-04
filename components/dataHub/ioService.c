@@ -47,6 +47,12 @@ LE_MEM_DEFINE_STATIC_POOL(UpdateStartEndHandlerPool,
                           DEFAULT_UPDATE_HANDLER_POOL_SIZE,
                           sizeof(UpdateStartEndHandler_t));
 
+//--------------------------------------------------------------------------------------------------
+/**
+ *  Current number of registered push handlers:
+ */
+//--------------------------------------------------------------------------------------------------
+static unsigned int PushHandlerCount;
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -517,6 +523,13 @@ static hub_HandlerRef_t AddPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
+#ifdef DHUB_IO_PUSH_HANDLER_COUNT
+    if (PushHandlerCount >= DHUB_IO_PUSH_HANDLER_COUNT)
+    {
+        LE_WARN("Cannot add any more io push handlers. Rejecting handler for %s", path);
+        return NULL;
+    }
+#endif
     resTree_EntryRef_t nsRef = hub_GetClientNamespace(io_GetClientSessionRef());
     if (nsRef == NULL)
     {
@@ -544,6 +557,10 @@ static hub_HandlerRef_t AddPushHandler
     }
 
     hub_HandlerRef_t handlerRef = resTree_AddPushHandler(resRef, dataType, callbackPtr, contextPtr);
+    if (handlerRef == NULL)
+    {
+        return NULL;
+    }
 
     // If the resource has a current value call the push handler now (if it's a data type match).
     dataSample_Ref_t sampleRef = resTree_GetCurrentValue(resRef);
@@ -551,7 +568,15 @@ static hub_HandlerRef_t AddPushHandler
     {
         handler_Call(handlerRef, resTree_GetDataType(resRef), sampleRef);
     }
+    else
+    {
+        LE_WARN("failed to get current value");
+    }
 
+    if (handlerRef)
+    {
+        PushHandlerCount++;
+    }
     return handlerRef;
 }
 
@@ -591,7 +616,11 @@ void io_RemoveTriggerPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -630,7 +659,11 @@ void io_RemoveBooleanPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -670,7 +703,11 @@ void io_RemoveNumericPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -710,7 +747,11 @@ void io_RemoveStringPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -749,7 +790,11 @@ void io_RemoveJsonPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -1177,15 +1222,31 @@ io_UpdateStartEndHandlerRef_t io_AddUpdateStartEndHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    UpdateStartEndHandler_t* handlerPtr = le_mem_Alloc(UpdateStartEndHandlerPool);
+    UpdateStartEndHandler_t* handlerPtr = NULL;
+    // When there is a maximum count defined for the update handler, datahub can only register that
+    // many handlers and further attempts to allocate a handler will be rejected.
+    // In this case, le_mem_TryAlloc is used for safe allocation.
+    // When there is no maximum count defined, le_mem_Alloc is used so the UpdateStartEndHandlerPool
+    // can either grow to support more handlers than it was initially configured for or cause an
+    // assertion depending on system configurations.
+#ifdef DHUB_IO_UPDATE_STARTEND_HANDLER_COUNT
+    handlerPtr = le_mem_TryAlloc(UpdateStartEndHandlerPool);
+#else
+    handlerPtr = le_mem_Alloc(UpdateStartEndHandlerPool);
+#endif
+    if (handlerPtr != NULL)
+    {
+        handlerPtr->link = LE_DLS_LINK_INIT;
 
-    handlerPtr->link = LE_DLS_LINK_INIT;
+        handlerPtr->callback = callbackPtr;
+        handlerPtr->contextPtr = contextPtr;
 
-    handlerPtr->callback = callbackPtr;
-    handlerPtr->contextPtr = contextPtr;
-
-    le_dls_Queue(&UpdateStartEndHandlerList, &handlerPtr->link);
-
+        le_dls_Queue(&UpdateStartEndHandlerList, &handlerPtr->link);
+    }
+    else
+    {
+        LE_WARN("Failed to add handler for start end");
+    }
     return (io_UpdateStartEndHandlerRef_t)handlerPtr;
 }
 
@@ -1245,6 +1306,13 @@ void ioService_Init
 )
 //--------------------------------------------------------------------------------------------------
 {
+#ifdef DHUB_IO_UPDATE_STARTEND_HANDLER_COUNT
+    // If a maximum is defined for update handlers, the pool size must be equal to the maximum.
+    static_assert(LE_MEM_BLOCKS(UpdateStartEndHandlerPool, DEFAULT_UPDATE_HANDLER_POOL_SIZE) == \
+                  DHUB_IO_UPDATE_STARTEND_HANDLER_COUNT,
+                  "Size of UpdateStartEndHandlerPool is not equal to "
+                  "DHUB_IO_UPDATE_STARTEND_HANDLER_COUNT");
+#endif
     UpdateStartEndHandlerPool = le_mem_InitStaticPool(UpdateStartEndHandlerPool,
                                                       DEFAULT_UPDATE_HANDLER_POOL_SIZE,
                                                       sizeof(UpdateStartEndHandler_t));

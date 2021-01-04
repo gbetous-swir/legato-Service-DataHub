@@ -66,6 +66,16 @@ void handler_Init
 )
 //--------------------------------------------------------------------------------------------------
 {
+#ifdef DHUB_IO_PUSH_HANDLER_COUNT
+#ifdef DHUB_ADMIN_PUSH_HANDLER_COUNT
+#ifdef DHUB_QUERY_PUSH_HANDLER_COUNT
+    static_assert(LE_MEM_BLOCKS(HandlerPool, DEFAULT_PUSH_HANDLER_POOL_SIZE) == \
+                  (DHUB_IO_PUSH_HANDLER_COUNT + DHUB_ADMIN_PUSH_HANDLER_COUNT + \
+                   DHUB_QUERY_PUSH_HANDLER_COUNT),
+                  "Size of HandlerPool is not equal to sum of all push handler quotas.");
+#endif
+#endif
+#endif
     HandlerPool = le_mem_InitStaticPool(HandlerPool, DEFAULT_PUSH_HANDLER_POOL_SIZE,
                     sizeof(Handler_t));
 
@@ -126,16 +136,20 @@ static void DeleteHandler
 //--------------------------------------------------------------------------------------------------
 /**
  * Remove a Handler from a given list.
+ *
+ * @return:
+ *      - LE_OK If handler was valid and it was removed successfully.
+ *      - LE_FAULT otherwise.
  */
 //--------------------------------------------------------------------------------------------------
-void handler_Remove
+le_result_t handler_Remove
 (
     hub_HandlerRef_t handlerRef
 )
 //--------------------------------------------------------------------------------------------------
 {
     Handler_t* handlerPtr = le_ref_Lookup(HandlerRefMap, handlerRef);
-
+    le_result_t ret = LE_OK;
     if (handlerPtr != NULL)
     {
         le_dls_Remove(handlerPtr->listPtr, &handlerPtr->link);
@@ -145,7 +159,9 @@ void handler_Remove
     else
     {
         LE_ERROR("Invalid handler reference %p", handlerRef);
+        ret = LE_FAULT;
     }
+    return ret;
 }
 
 

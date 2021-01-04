@@ -12,6 +12,13 @@
 
 //--------------------------------------------------------------------------------------------------
 /**
+ *  Current number of registered push handlers:
+ */
+//--------------------------------------------------------------------------------------------------
+static unsigned int PushHandlerCount;
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Find an Observation.
  *
  * @return Reference to the Observation's resource tree entry, or NULL if not found.
@@ -1030,6 +1037,7 @@ le_result_t query_GetJsonExample
  * be created.
  *
  * @return A reference to the handler, which can be removed using handler_Remove().
+ *         If adding the handler fails, NULL is returned.
  */
 //--------------------------------------------------------------------------------------------------
 static hub_HandlerRef_t AddPushHandler
@@ -1041,14 +1049,24 @@ static hub_HandlerRef_t AddPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
+#ifdef DHUB_QUERY_PUSH_HANDLER_COUNT
+    if (PushHandlerCount >= DHUB_QUERY_PUSH_HANDLER_COUNT)
+    {
+        return NULL;
+    }
+#endif
     resTree_EntryRef_t resRef = resTree_GetResource(resTree_GetRoot(), path);
     if (resRef == NULL)
     {
-        LE_CRIT("Bad resource path '%s'.", path);
+        LE_ERROR("Failed to get resource at '%s'.", path);
         return NULL;
     }
-
-    return resTree_AddPushHandler(resRef, dataType, callbackPtr, contextPtr);
+    hub_HandlerRef_t handlerRef = resTree_AddPushHandler(resRef, dataType, callbackPtr, contextPtr);
+    if (handlerRef)
+    {
+        PushHandlerCount++;
+    }
+    return handlerRef;
 }
 
 
@@ -1086,7 +1104,11 @@ void query_RemoveTriggerPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -1124,7 +1146,11 @@ void query_RemoveBooleanPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -1162,7 +1188,11 @@ void query_RemoveNumericPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -1200,7 +1230,11 @@ void query_RemoveStringPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -1238,5 +1272,9 @@ void query_RemoveJsonPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }

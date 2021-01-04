@@ -42,6 +42,13 @@ LE_MEM_DEFINE_STATIC_POOL(ResourceTreeChangeHandlerPool,
 
 //--------------------------------------------------------------------------------------------------
 /**
+ *  Current number of registered push handlers:
+ */
+//--------------------------------------------------------------------------------------------------
+static unsigned int PushHandlerCount;
+
+//--------------------------------------------------------------------------------------------------
+/**
  * @return A reference to the '/obs' namespace.  Creates it if necessary.
  */
 //--------------------------------------------------------------------------------------------------
@@ -256,14 +263,27 @@ static hub_HandlerRef_t AddPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
+#ifdef DHUB_ADMIN_PUSH_HANDLER_COUNT
+    if (PushHandlerCount >= DHUB_ADMIN_PUSH_HANDLER_COUNT)
+    {
+        LE_WARN("Cannot add any more admin push handlers. Rejecting handler on %s", path);
+        return NULL;
+    }
+#endif
     resTree_EntryRef_t resRef = resTree_GetResource(resTree_GetRoot(), path);
     if (resRef == NULL)
     {
-        LE_CRIT("Bad resource path '%s'.", path);
+        LE_ERROR("Failed to get resource at '%s'. Cannot add handler", path);
         return NULL;
     }
 
-    return resTree_AddPushHandler(resRef, dataType, callbackPtr, contextPtr);
+    hub_HandlerRef_t handlerRef = resTree_AddPushHandler(resRef, dataType, callbackPtr, contextPtr);
+    if (handlerRef)
+    {
+        PushHandlerCount++;
+        LE_DEBUG("Added Handler %p, current handler count: %d", handlerRef, PushHandlerCount);
+    }
+    return handlerRef;
 }
 
 
@@ -301,7 +321,11 @@ void admin_RemoveTriggerPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -339,7 +363,11 @@ void admin_RemoveBooleanPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -377,7 +405,11 @@ void admin_RemoveNumericPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -415,7 +447,11 @@ void admin_RemoveStringPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -453,7 +489,11 @@ void admin_RemoveJsonPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    handler_Remove((hub_HandlerRef_t)handlerRef);
+    if (handler_Remove((hub_HandlerRef_t)handlerRef) == LE_OK)
+    {
+        LE_ASSERT(PushHandlerCount != 0);
+        PushHandlerCount--;
+    }
 }
 
 
@@ -2112,15 +2152,31 @@ admin_ResourceTreeChangeHandlerRef_t admin_AddResourceTreeChangeHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    ResourceTreeChangeHandler_t* handlerPtr = le_mem_Alloc(ResourceTreeChangeHandlerPool);
+    ResourceTreeChangeHandler_t* handlerPtr = NULL;
+    // When there is a maximum count defined for the resource tree change handler, datahub can only
+    // register that many handlers and further attempts to allocate a handler will be rejected.
+    // In this case, le_mem_TryAlloc is used for safe allocation.
+    // When there is no maximum count defined, le_mem_Alloc is used so the
+    // ResourceTreeChangeHandlerPool can either grow to support more handlers than it was initially
+    // configured for or cause an assertion depending on system configuration.
+#ifdef DHUB_ADMIN_RESOURCE_TREE_CHANGE_HANDLER_COUNT
+    handlerPtr = le_mem_TryAlloc(ResourceTreeChangeHandlerPool);
+#else
+    handlerPtr = le_mem_Alloc(ResourceTreeChangeHandlerPool);
+#endif
+    if (handlerPtr != NULL)
+    {
+        handlerPtr->link = LE_DLS_LINK_INIT;
 
-    handlerPtr->link = LE_DLS_LINK_INIT;
+        handlerPtr->callback = callbackPtr;
+        handlerPtr->contextPtr = contextPtr;
 
-    handlerPtr->callback = callbackPtr;
-    handlerPtr->contextPtr = contextPtr;
-
-    le_dls_Queue(&ResourceTreeChangeHandlerList, &handlerPtr->link);
-
+        le_dls_Queue(&ResourceTreeChangeHandlerList, &handlerPtr->link);
+    }
+    else
+    {
+        LE_WARN("Cannot add any more resource tree change handlers. Rejecting request.");
+    }
     return (admin_ResourceTreeChangeHandlerRef_t)handlerPtr;
 }
 
@@ -2179,6 +2235,15 @@ void adminService_Init
 )
 //--------------------------------------------------------------------------------------------------
 {
+#ifdef DHUB_ADMIN_RESOURCE_TREE_CHANGE_HANDLER_COUNT
+    // If a maximum is defined for resource tree change handlers, the pool size must be equal to the
+    // maximum value.
+    static_assert(LE_MEM_BLOCKS(ResourceTreeChangeHandlerPool,
+                                DEFAULT_RESOURCE_TREE_CHANGE_HANDLER_POOL_SIZE) == \
+                  DHUB_ADMIN_RESOURCE_TREE_CHANGE_HANDLER_COUNT,
+                  "Size of ResourceTreeChangeHandlerPool is not equal to "
+                  "DHUB_ADMIN_RESOURCE_TREE_CHANGE_HANDLER_COUNT");
+#endif
     ResourceTreeChangeHandlerPool = le_mem_InitStaticPool(ResourceTreeChangeHandlerPool,
         DEFAULT_RESOURCE_TREE_CHANGE_HANDLER_POOL_SIZE, sizeof(ResourceTreeChangeHandler_t));
 }

@@ -44,9 +44,13 @@ hub_HandlerRef_t handler_Add
 //--------------------------------------------------------------------------------------------------
 /**
  * Remove a Handler from whatever list it is on.
+ *
+ * @return:
+ *      - LE_OK If handler was valid and it was removed successfully.
+ *      - LE_FAULT otherwise.
  */
 //--------------------------------------------------------------------------------------------------
-void handler_Remove
+le_result_t handler_Remove
 (
     hub_HandlerRef_t handlerRef
 );
