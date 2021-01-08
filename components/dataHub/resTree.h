@@ -192,18 +192,18 @@ LE_SHARED io_DataType_t resTree_GetDataType
  * Creates a Namespace if nothing exists at that path.
  * Also creates parent, grandparent, etc. Namespaces, as needed.
  *
- * @return Reference to the object, or NULL if the path is malformed.
- *
- * @note The caller is responsible for the one and only reference count on this object that
- *       they now hold.
+ * @return
+ *      - LE_OK If getting entry was successful and entryRefPtr points to entry reference.
+ *      - LE_NO_MEMORY If there was a failure in memory allocation.
+ *      - LE_BAD_PARAMETER If path is malformed.
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetEntry
+le_result_t resTree_GetEntry
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
-    const char* path    ///< Path.
+    const char* path,                 ///< Path.
+    resTree_EntryRef_t* entryRefPtr   ///<[OUT] Pointer to write reference to object to.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -211,16 +211,20 @@ resTree_EntryRef_t resTree_GetEntry
  * Creates a Placeholder resource if nothing exists at that path.
  * Also creates parent, grandparent, etc. Namespaces, as needed.
  *
- * If there's already a Namespace at the given path, it will be deleted and replaced by a
+ * If there's already a Namespace at the given path, it will be replaced by a
  * Placeholder.
  *
- * @return Reference to the object, or NULL if the path is malformed.
+ * @return
+ *      - LE_OK If getting resource was successful. entryRefPtr points to entry reference.
+ *      - LE_BAD_PARAMETER If path is malformed.
+ *      - LE_NO_MEMORY There was a failure to allocate memory.
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetResource
+le_result_t resTree_GetResource
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
-    const char* path    ///< Path.
+    const char* path,                 ///< Path.
+    resTree_EntryRef_t* entryRefPtr   ///<[OUT] Pointer to write reference to object to.
 );
 
 
@@ -233,17 +237,22 @@ resTree_EntryRef_t resTree_GetResource
  * If there's already a Namespace or Placeholder at the given path, it will be deleted and
  * replaced by an Input.
  *
- * @return Reference to the object, or NULL if the path is malformed, an Output or Observation
+ * @return
+ *      - LE_OK If successful.
+ *      - LE_NO_MEMORY If getting input required creating a new input but there was no memory to
+ *          allocate the input.
+ *      - LE_BAD_PARAMETER If path is malformed, an Output or Observation
  *         already exists at that location, or an Input with different units or data type already
- *         exists at that location.
+ *         exists at that location
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetInput
+le_result_t resTree_GetInput
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path,       ///< Path.
     io_DataType_t dataType, ///< The data type.
-    const char* units       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
+    const char* units,       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
+    resTree_EntryRef_t* entryRefPtr ///<[OUT] Pointer to write reference to object to.
 );
 
 
@@ -256,17 +265,22 @@ resTree_EntryRef_t resTree_GetInput
  * If there's already a Namespace or Placeholder at the given path, it will be deleted and
  * replaced by an Output.
  *
- * @return Reference to the object, or NULL if the path is malformed, an Input or Observation
- *         already exists at that location, or an Output with different units or data type already
- *         exists at that location.
+ * @return
+ *      - LE_OK If successful.
+ *      - LE_NO_MEMORY If getting input required creating a new input but there was no memory to
+ *          allocate the input.
+ *      - LE_BAD_PARAMETER If path is malformed, an Output or Observation
+ *         already exists at that location, or an Input with different units or data type already
+ *         exists at that location
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetOutput
+le_result_t resTree_GetOutput
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path,       ///< Path.
     io_DataType_t dataType, ///< The data type.
-    const char* units       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
+    const char* units,      ///< Units string, e.g., "degC" (see senml); "" = unspecified.
+    resTree_EntryRef_t* entryRefPtr ///<[OUT] Pointer to write reference to object to.
 );
 
 
@@ -279,14 +293,18 @@ resTree_EntryRef_t resTree_GetOutput
  * If there's already a Namespace or Placeholder at the given path, it will be deleted and
  * replaced by an Observation.
  *
- * @return Reference to the object, or NULL if the path is malformed or an Input or Output already
- *         exists at that location.
+ * @return
+ *      - LE_OK If getting observation was successful. entryRefPtr points to entry reference.
+ *      - LE_BAD_PARAMETER If the path is malformed or an Input or Output already exists at that
+ *        location.
+ *      - LE_NO_MEMORY If there was a failure to allocate memory.
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetObservation
+le_result_t resTree_GetObservation
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
-    const char* path    ///< Path.
+    const char* path,                 ///< Path.
+    resTree_EntryRef_t* entryRefPtr   ///<[OUT] Pointer to write reference to object to.
 );
 
 
@@ -372,9 +390,16 @@ LE_SHARED resTree_EntryRef_t resTree_GetNextSibling
  * Push a data sample to a resource.
  *
  * @note Takes ownership of the data sample reference.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_FAULT is any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void resTree_Push
+le_result_t resTree_Push
 (
     resTree_EntryRef_t entryRef,    ///< The entry to push to.
     io_DataType_t dataType,         ///< The data type.
@@ -386,7 +411,7 @@ void resTree_Push
 /**
  * Add a Push Handler to an Output resource.
  *
- * @return Reference to the handler added.
+ * @return Reference to the handler added. NULL if failed to add handler.
  *
  * @note Can be removed by calling handler_Remove().
  */
@@ -702,11 +727,14 @@ LE_SHARED bool resTree_IsMandatory
 /**
  * Set the default value of a resource.
  *
- * @note Default will be discarded by an Input or Output resource if the default's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-void resTree_SetDefault
+le_result_t resTree_SetDefault
 (
     resTree_EntryRef_t resEntry,
     io_DataType_t dataType,
@@ -768,11 +796,14 @@ void resTree_RemoveDefault
 /**
  * Set an override on a given resource.
  *
- * @note Override will be discarded by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-void resTree_SetOverride
+le_result_t resTree_SetOverride
 (
     resTree_EntryRef_t resEntry,
     io_DataType_t dataType,

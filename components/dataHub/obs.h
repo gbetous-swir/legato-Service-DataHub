@@ -46,7 +46,7 @@ void obs_Init
  * Create an Observation object.  This allocates the object and initializes the class members,
  * but not the parent class members.
  *
- * @return Pointer to the new object.
+ * @return Pointer to the new object or NULL if failed to allocate an observation.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* obs_Create

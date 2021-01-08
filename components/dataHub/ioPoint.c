@@ -78,7 +78,7 @@ void ioPoint_Init
 /**
  * Create an Input/Output Resource object.
  *
- * @return Pointer to the Resource.
+ * @return Pointer to the Resource or NULL if it failed to create a resource.
  */
 //--------------------------------------------------------------------------------------------------
 IoResource_t* Create
@@ -88,24 +88,25 @@ IoResource_t* Create
 )
 //--------------------------------------------------------------------------------------------------
 {
-    IoResource_t* ioPtr = le_mem_Alloc(IoResourcePool);
+    IoResource_t* ioPtr = hub_MemAlloc(IoResourcePool);
 
-    res_Construct(&ioPtr->resource, entryRef);
+    if (ioPtr)
+    {
+        res_Construct(&ioPtr->resource, entryRef);
 
-    ioPtr->pollHandlerList = LE_DLS_LIST_INIT;
+        ioPtr->pollHandlerList = LE_DLS_LIST_INIT;
 
-    ioPtr->dataType = dataType;
-    ioPtr->isMandatory = false;
-
+        ioPtr->dataType = dataType;
+        ioPtr->isMandatory = false;
+    }
     return ioPtr;
 }
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Create an Input Resource.
  *
- * @return Pointer to the Resource.
+ * @return Pointer to the Resource or NULL if it failed to create a resource.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* ioPoint_CreateInput
@@ -115,7 +116,13 @@ res_Resource_t* ioPoint_CreateInput
 )
 //--------------------------------------------------------------------------------------------------
 {
-    return &(Create(dataType, entryRef)->resource);
+    res_Resource_t* ret = NULL;
+    IoResource_t* ioPtr = Create(dataType, entryRef);
+    if (ioPtr)
+    {
+        ret = &(ioPtr->resource);
+    }
+    return ret;
 }
 
 
@@ -123,7 +130,7 @@ res_Resource_t* ioPoint_CreateInput
 /**
  * Create an Output Resource.
  *
- * @return Pointer to the Resource.
+ * @return Pointer to the Resource or NULL if it failed to create a resource.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* ioPoint_CreateOutput
@@ -133,12 +140,16 @@ res_Resource_t* ioPoint_CreateOutput
 )
 //--------------------------------------------------------------------------------------------------
 {
+    res_Resource_t* ret = NULL;
     IoResource_t* ioPtr = Create(dataType, entryRef);
 
-    // By default, all outputs are mandatory.
-    ioPtr->isMandatory = true;
-
-    return &(ioPtr->resource);
+    if (ioPtr)
+    {
+        // By default, all outputs are mandatory.
+        ioPtr->isMandatory = true;
+        ret = &(ioPtr->resource);
+    }
+    return ret;
 }
 
 
@@ -165,9 +176,13 @@ io_DataType_t ioPoint_GetDataType
 /**
  * Perform type coercion, replacing a data sample with another of a different type, if necessary,
  * to make the data compatible with the data type of a given Input or Output resource.
+ *
+ * @return
+ *      - LE_OK If coercion happened successfully.
+ *      - LE_NO_MEMORY If could not coerce to a new type because failed to allocate a new datasample
  */
 //--------------------------------------------------------------------------------------------------
-void ioPoint_DoTypeCoercion
+le_result_t ioPoint_DoTypeCoercion
 (
     res_Resource_t* resPtr,
     io_DataType_t* dataTypePtr,     ///< [INOUT] the data type, may be changed by type coercion
@@ -182,7 +197,7 @@ void ioPoint_DoTypeCoercion
 
     io_DataType_t toType = ioPtr->dataType;
     dataSample_Ref_t toSample = NULL;
-
+    bool needsTypeConversion = true;
     double timestamp = dataSample_GetTimestamp(fromSample);
 
     switch (toType)
@@ -193,6 +208,7 @@ void ioPoint_DoTypeCoercion
             // same timestamp as the original sample.  Otherwise no type conversion required.
             if (fromType != IO_DATA_TYPE_TRIGGER)
             {
+                le_mem_Release(fromSample);
                 toSample = dataSample_CreateTrigger(timestamp);
             }
             break;
@@ -204,16 +220,18 @@ void ioPoint_DoTypeCoercion
                 case IO_DATA_TYPE_TRIGGER:
 
                     // If the pushed sample is a trigger, just use false.
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateBoolean(timestamp, false);
                     break;
 
                 case IO_DATA_TYPE_BOOLEAN:
-
+                    needsTypeConversion = false;
                     break;  // No conversion required.
 
                 case IO_DATA_TYPE_NUMERIC:
                 {
                     double value = dataSample_GetNumeric(fromSample);
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateBoolean(timestamp, (value != 0));
                     break;
                 }
@@ -221,13 +239,16 @@ void ioPoint_DoTypeCoercion
                 case IO_DATA_TYPE_STRING:
                 {
                     const char* value = dataSample_GetString(fromSample);
-                    toSample = dataSample_CreateBoolean(timestamp, (value[0] != '\0'));
+                    bool boolValue = (value[0] != '\0');
+                    le_mem_Release(fromSample);
+                    toSample = dataSample_CreateBoolean(timestamp, boolValue);
                     break;
                 }
 
                 case IO_DATA_TYPE_JSON:
                 {
                     bool newValue = json_ConvertToBoolean(dataSample_GetJson(fromSample));
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateBoolean(timestamp, newValue);
                     break;
                 }
@@ -241,23 +262,26 @@ void ioPoint_DoTypeCoercion
             {
                 case IO_DATA_TYPE_TRIGGER:
 
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateNumeric(timestamp, NAN);
                     break;
 
                 case IO_DATA_TYPE_BOOLEAN:
                 {
                     double newValue = (dataSample_GetBoolean(fromSample) ? 1 : 0);
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateNumeric(timestamp, newValue);
                     break;
                 }
 
                 case IO_DATA_TYPE_NUMERIC:
-
+                    needsTypeConversion = false;
                     break;  // No conversion required.
 
                 case IO_DATA_TYPE_STRING:
                 {
                     double newValue = (dataSample_GetString(fromSample)[0] == '\0' ? 0 : 1);
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateNumeric(timestamp, newValue);
                     break;
                 }
@@ -265,6 +289,7 @@ void ioPoint_DoTypeCoercion
                 case IO_DATA_TYPE_JSON:
                 {
                     double newValue = json_ConvertToNumber(dataSample_GetJson(fromSample));
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateNumeric(timestamp, newValue);
                     break;
                 }
@@ -277,6 +302,7 @@ void ioPoint_DoTypeCoercion
             {
                 case IO_DATA_TYPE_TRIGGER:
 
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateString(timestamp, "");
                     break;
 
@@ -284,6 +310,7 @@ void ioPoint_DoTypeCoercion
                 {
                     bool oldValue = dataSample_GetBoolean(fromSample);
                     const char* newValue = oldValue ? "true" : "false";
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateString(timestamp, newValue);
                     break;
                 }
@@ -299,12 +326,13 @@ void ioPoint_DoTypeCoercion
                         LE_CRIT("String overflow.");
                         newValue[0] = '\0';
                     }
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateString(timestamp, newValue);
                     break;
                 }
 
                 case IO_DATA_TYPE_STRING:
-
+                    needsTypeConversion = false;
                     break;  // No conversion required.
 
                 case IO_DATA_TYPE_JSON:
@@ -320,7 +348,7 @@ void ioPoint_DoTypeCoercion
             switch (fromType)
             {
                 case IO_DATA_TYPE_TRIGGER:
-
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateJson(timestamp, "null");
                     break;
 
@@ -328,6 +356,7 @@ void ioPoint_DoTypeCoercion
                 {
                     bool oldValue = dataSample_GetBoolean(fromSample);
                     const char* newValue = oldValue ? "true" : "false";
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateJson(timestamp, newValue);
                     break;
                 }
@@ -343,6 +372,7 @@ void ioPoint_DoTypeCoercion
                         LE_CRIT("String overflow.");
                         newValue[0] = '\0';
                     }
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateJson(timestamp, newValue);
                     break;
                 }
@@ -359,12 +389,13 @@ void ioPoint_DoTypeCoercion
                         newValue[sizeof(newValue - 2)] = '"';
                         newValue[sizeof(newValue - 1)] = '\0';
                     }
+                    le_mem_Release(fromSample);
                     toSample = dataSample_CreateJson(timestamp, newValue);
                     break;
                 }
 
                 case IO_DATA_TYPE_JSON:
-
+                    needsTypeConversion = false;
                     break;  // No conversion required.
             }
             break;
@@ -373,9 +404,17 @@ void ioPoint_DoTypeCoercion
     // If a conversion happened, release the old value and replace it with the new one.
     if (toSample != NULL)
     {
-        le_mem_Release(fromSample);
         *valueRefPtr = toSample;
         *dataTypePtr = toType;
+        return LE_OK;
+    }
+    else if (needsTypeConversion)
+    {
+        return LE_NO_MEMORY;
+    }
+    else
+    {
+        return LE_OK;
     }
 }
 

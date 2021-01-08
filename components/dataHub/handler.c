@@ -87,7 +87,7 @@ void handler_Init
 /**
  * Add a Handler to a given list.
  *
- * @return Reference to the handler added.
+ * @return Reference to the handler added. NULL if failed to add handler.
  */
 //--------------------------------------------------------------------------------------------------
 hub_HandlerRef_t handler_Add
@@ -99,7 +99,13 @@ hub_HandlerRef_t handler_Add
 )
 //--------------------------------------------------------------------------------------------------
 {
-    Handler_t* handlerPtr = le_mem_Alloc(HandlerPool);
+    Handler_t* handlerPtr = hub_MemAlloc(HandlerPool);
+
+    if (handlerPtr == NULL)
+    {
+        LE_WARN("Failed to allocate a Handler");
+        return NULL;
+    }
 
     handlerPtr->link = LE_DLS_LINK_INIT;
     handlerPtr->safeRef = le_ref_CreateRef(HandlerRefMap, handlerPtr);
@@ -109,6 +115,8 @@ hub_HandlerRef_t handler_Add
     handlerPtr->contextPtr = contextPtr;
 
     le_dls_Queue(listPtr, &handlerPtr->link);
+
+    LE_DEBUG("Added Handler %p for %d", (hub_HandlerRef_t)handlerPtr->safeRef, dataType);
 
     return (hub_HandlerRef_t)(handlerPtr->safeRef);
 }
@@ -127,6 +135,7 @@ static void DeleteHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
+    LE_DEBUG("Deleting handler %p", handlerPtr->safeRef);
     le_ref_DeleteRef(HandlerRefMap, handlerPtr->safeRef);
 
     le_mem_Release(handlerPtr);
@@ -137,7 +146,7 @@ static void DeleteHandler
 /**
  * Remove a Handler from a given list.
  *
- * @return:
+ * @return
  *      - LE_OK If handler was valid and it was removed successfully.
  *      - LE_FAULT otherwise.
  */
@@ -158,7 +167,7 @@ le_result_t handler_Remove
     }
     else
     {
-        LE_ERROR("Invalid handler reference %p", handlerRef);
+        LE_ERROR("Invalid handler reference %p. Cannot remove", handlerRef);
         ret = LE_FAULT;
     }
     return ret;
@@ -198,7 +207,6 @@ static void CallPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-
     if (handlerPtr->dataType == dataType)
     {
         double timestamp = dataSample_GetTimestamp(sampleRef);
@@ -306,7 +314,6 @@ void handler_Call
 //--------------------------------------------------------------------------------------------------
 {
     Handler_t* handlerPtr = le_ref_Lookup(HandlerRefMap, handlerRef);
-
     if (handlerPtr == NULL)
     {
         LE_CRIT("Invalid handler reference %p", handlerRef);
@@ -333,6 +340,7 @@ void handler_CallAll
 {
     // Iterate over the Push Handler List and call each one that is a data type match.
     le_dls_Link_t* linkPtr = le_dls_Peek(listPtr);
+
     while (linkPtr != NULL)
     {
         Handler_t* handlerPtr = CONTAINER_OF(linkPtr, Handler_t, link);

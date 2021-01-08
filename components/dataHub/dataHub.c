@@ -131,7 +131,7 @@ const char* hub_GetEntryTypeName
 /**
  * Set the client app's namespace.
  *
- * @return:
+ * @return
  *  - LE_OK if setting client's namespace was successful.
  *  - LE_DUPLICATE if namespace has already been set.
  */
@@ -150,9 +150,9 @@ le_result_t hub_SetClientNamespace
 
     resTree_EntryRef_t nsRef;
     // Get the "/app" namespace first.
-    nsRef = resTree_GetEntry(resTree_GetRoot(), "app");
+    LE_ASSERT(resTree_GetEntry(resTree_GetRoot(), "app", &nsRef) == LE_OK);
     // Now get the app's namespace under the /app namespace.
-    nsRef = resTree_GetEntry(nsRef, appNamespace);
+    LE_ASSERT(resTree_GetEntry(nsRef, appNamespace, &nsRef) == LE_OK);
 
     le_mem_AddRef(nsRef);
 
@@ -203,12 +203,87 @@ resTree_EntryRef_t hub_GetClientNamespace
         return NULL;
     }
     // Get the "/app" namespace first.
-    nsRef = resTree_GetEntry(resTree_GetRoot(), "app");
+    LE_ASSERT(resTree_GetEntry(resTree_GetRoot(), "app", &nsRef) == LE_OK);
     // Now get the app's namespace under the /app namespace.
-    nsRef = resTree_GetEntry(nsRef, appName);
+    LE_ASSERT(resTree_GetEntry(nsRef, appName, &nsRef) == LE_OK);
     // Store the namespace entry reference as the IPC session Context Ptr to speed things up
     // next time.
     le_msg_SetSessionContextPtr(sessionRef, nsRef);
     return nsRef;
 }
 
+//--------------------------------------------------------------------------------------------------
+/**
+ *  Allocate memory from pool
+ *
+ *  @return
+ *      Pointer to the allocated object or NULL if failed to allocate.
+ */
+//--------------------------------------------------------------------------------------------------
+void* hub_MemAlloc
+(
+    le_mem_PoolRef_t    pool    ///< [IN] Pool from which the object is to be allocated.
+)
+//--------------------------------------------------------------------------------------------------
+{
+#if LE_CONFIG_LINUX
+    return le_mem_Alloc(pool);
+#else
+    return le_mem_TryAlloc(pool);
+#endif
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
+ *  Is resource Path malformed?
+ *
+ *  @return
+ *      true If path is malformed.
+ *      false is path is valid.
+ */
+//--------------------------------------------------------------------------------------------------
+bool hub_IsResourcePathMalformed
+(
+    const char* path
+)
+//--------------------------------------------------------------------------------------------------
+{
+    const char* illegalCharPtr = strpbrk(path, ".[]");
+    if (illegalCharPtr != NULL)
+    {
+        LE_ERROR("Illegal character '%c' in path '%s'.", *illegalCharPtr, path);
+        return true;
+    }
+    size_t i = 0;   // Index into path.
+
+    while (path[i] != '\0' && i < HUB_MAX_RESOURCE_PATH_BYTES)
+    {
+        // If we're at a slash, skip it.
+        if (path[i] == '/')
+        {
+            i++;
+        }
+
+        // Look for a slash or the end of the string as the terminator of the next entry name.
+        const char* terminatorPtr = strchrnul(path + i, '/');
+
+        // Compute the length of the entry name in this path element.
+        size_t nameLen = terminatorPtr - (path + i);
+
+        // Sanity check the length.
+        if (nameLen == 0)
+        {
+            LE_ERROR("Resource path element missing in path '%s'.", path);
+            return true;
+        }
+        if (nameLen >= HUB_MAX_ENTRY_NAME_BYTES)
+        {
+            LE_ERROR("Resource path element too long in path '%s'.", path);
+            return true;
+        }
+
+        // Advance the index past the name.
+        i += nameLen;
+    }
+    return false;
+}

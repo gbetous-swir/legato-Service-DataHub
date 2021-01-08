@@ -1101,10 +1101,10 @@ static void SetSetting
 (
     const char* path,
     const char* value,
-    void (*booleanFunc)(const char*, bool),
-    void (*numericFunc)(const char*, double),
-    void (*stringFunc)(const char*, const char*),
-    void (*jsonFunc)(const char*, const char*)
+    le_result_t (*booleanFunc)(const char*, bool),
+    le_result_t (*numericFunc)(const char*, double),
+    le_result_t (*stringFunc)(const char*, const char*),
+    le_result_t (*jsonFunc)(const char*, const char*)
 )
 //--------------------------------------------------------------------------------------------------
 {
@@ -1148,7 +1148,7 @@ static void SetDoubleSetting
 (
     const char* path,
     const char* valueStr,
-    void (*func)(const char*, double)
+    le_result_t (*func)(const char*, double)
 )
 //--------------------------------------------------------------------------------------------------
 {
@@ -1202,7 +1202,7 @@ static void SetIntegerSetting
 (
     const char* path,
     const char* valueStr,
-    void (*setterFunc)(const char*, uint32_t)
+    le_result_t (*setterFunc)(const char*, uint32_t)
 )
 //--------------------------------------------------------------------------------------------------
 {

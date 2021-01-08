@@ -58,7 +58,8 @@ static resTree_EntryRef_t GetObsNamespace
 )
 //--------------------------------------------------------------------------------------------------
 {
-    resTree_EntryRef_t obsNamespace = resTree_GetEntry(resTree_GetRoot(), "obs");
+    resTree_EntryRef_t obsNamespace;
+    LE_ASSERT(resTree_GetEntry(resTree_GetRoot(), "obs", &obsNamespace) == LE_OK);
     LE_ASSERT(obsNamespace != NULL);
 
     return obsNamespace;
@@ -68,11 +69,21 @@ static resTree_EntryRef_t GetObsNamespace
 /**
  * Push a trigger type data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_PushTrigger
+le_result_t admin_PushTrigger
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -83,17 +94,27 @@ void admin_PushTrigger
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t entry = resTree_FindEntryAtAbsolutePath(path);
+    le_result_t ret;
 
     if (entry != NULL)
     {
-        resTree_Push(entry,
-                     IO_DATA_TYPE_TRIGGER,
-                     dataSample_CreateTrigger(timestamp));
+        dataSample_Ref_t dataSampleRef = dataSample_CreateTrigger(timestamp);
+        if (dataSampleRef)
+        {
+            ret = resTree_Push(entry, IO_DATA_TYPE_TRIGGER, dataSampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to push a trigger to path '%s'.", path);
+            ret = LE_NO_MEMORY;
+        }
     }
     else
     {
         LE_WARN("Discarding value pushed to non-existent resource '%s'.", path);
+        ret = LE_NOT_FOUND;
     }
+    return ret;
 }
 
 
@@ -101,11 +122,21 @@ void admin_PushTrigger
 /**
  * Push a Boolean type data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_PushBoolean
+le_result_t admin_PushBoolean
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -118,17 +149,27 @@ void admin_PushBoolean
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t entry = resTree_FindEntryAtAbsolutePath(path);
+    le_result_t ret;
 
     if (entry != NULL)
     {
-        resTree_Push(entry,
-                     IO_DATA_TYPE_BOOLEAN,
-                     dataSample_CreateBoolean(timestamp, value));
+        dataSample_Ref_t dataSampleRef = dataSample_CreateBoolean(timestamp, value);
+        if (dataSampleRef)
+        {
+            ret = resTree_Push(entry, IO_DATA_TYPE_BOOLEAN, dataSampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to push a boolean to path '%s'.", path);
+            ret = LE_NO_MEMORY;
+        }
     }
     else
     {
         LE_WARN("Discarding value pushed to non-existent resource '%s'.", path);
+        ret = LE_NOT_FOUND;
     }
+    return ret;
 }
 
 
@@ -136,11 +177,21 @@ void admin_PushBoolean
 /**
  * Push a numeric type data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_PushNumeric
+le_result_t admin_PushNumeric
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -153,17 +204,27 @@ void admin_PushNumeric
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t entry = resTree_FindEntryAtAbsolutePath(path);
+    le_result_t ret;
 
     if (entry != NULL)
     {
-        resTree_Push(entry,
-                     IO_DATA_TYPE_NUMERIC,
-                     dataSample_CreateNumeric(timestamp, value));
+        dataSample_Ref_t dataSampleRef = dataSample_CreateNumeric(timestamp, value);
+        if (dataSampleRef)
+        {
+            ret = resTree_Push(entry, IO_DATA_TYPE_NUMERIC, dataSampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to push a numeric to path '%s'.", path);
+            ret = LE_NO_MEMORY;
+        }
     }
     else
     {
         LE_WARN("Discarding value pushed to non-existent resource '%s'.", path);
+        ret = LE_NOT_FOUND;
     }
+    return ret;
 }
 
 
@@ -171,11 +232,21 @@ void admin_PushNumeric
 /**
  * Push a string type data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_PushString
+le_result_t admin_PushString
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -188,17 +259,27 @@ void admin_PushString
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t entry = resTree_FindEntryAtAbsolutePath(path);
+    le_result_t ret;
 
     if (entry != NULL)
     {
-        resTree_Push(entry,
-                     IO_DATA_TYPE_STRING,
-                     dataSample_CreateString(timestamp, value));
+        dataSample_Ref_t dataSampleRef = dataSample_CreateString(timestamp, value);
+        if (dataSampleRef)
+        {
+            ret = resTree_Push(entry, IO_DATA_TYPE_STRING, dataSampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to push a string to path '%s'.", path);
+            ret = LE_NO_MEMORY;
+        }
     }
     else
     {
         LE_WARN("Discarding value pushed to non-existent resource '%s'.", path);
+        ret = LE_NOT_FOUND;
     }
+    return ret;
 }
 
 
@@ -207,11 +288,21 @@ void admin_PushString
 /**
  * Push a JSON data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit or JSON is invalid.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_PushJson
+le_result_t admin_PushJson
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -224,24 +315,35 @@ void admin_PushJson
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t entry = resTree_FindEntryAtAbsolutePath(path);
+    le_result_t ret;
 
     if (entry != NULL)
     {
         if (json_IsValid(value))
         {
-            resTree_Push(entry,
-                         IO_DATA_TYPE_JSON,
-                         dataSample_CreateJson(timestamp, value));
+            dataSample_Ref_t dataSampleRef = dataSample_CreateJson(timestamp, value);
+            if (dataSampleRef)
+            {
+                ret = resTree_Push(entry, IO_DATA_TYPE_JSON, dataSampleRef);
+            }
+            else
+            {
+                LE_ERROR("Failed to push a JSON to path '%s'.", path);
+                ret = LE_NO_MEMORY;
+            }
         }
         else
         {
             LE_ERROR("Discarding invalid JSON string '%s'.", value);
+            ret = LE_BAD_PARAMETER;
         }
     }
     else
     {
         LE_WARN("Discarding value pushed to non-existent resource '%s'.", path);
+        ret = LE_NOT_FOUND;
     }
+    return ret;
 }
 
 
@@ -252,6 +354,7 @@ void admin_PushJson
  * be created.
  *
  * @return A reference to the handler, which can be removed using handler_Remove().
+ *         If adding the handler fails, NULL is returned.
  */
 //--------------------------------------------------------------------------------------------------
 static hub_HandlerRef_t AddPushHandler
@@ -270,8 +373,8 @@ static hub_HandlerRef_t AddPushHandler
         return NULL;
     }
 #endif
-    resTree_EntryRef_t resRef = resTree_GetResource(resTree_GetRoot(), path);
-    if (resRef == NULL)
+    resTree_EntryRef_t resRef;
+    if (resTree_GetResource(resTree_GetRoot(), path, &resRef) != LE_OK)
     {
         LE_ERROR("Failed to get resource at '%s'. Cannot add handler", path);
         return NULL;
@@ -509,6 +612,7 @@ void admin_RemoveJsonPushHandler
  *  - LE_OK if route already existed or new route was successfully created.
  *  - LE_BAD_PARAMETER if one of the paths is invalid.
  *  - LE_DUPLICATE if the addition of this route would result in a loop.
+ *  - LE_NO_MEMORY if there was a failure in memory allocation.
  */
 //--------------------------------------------------------------------------------------------------
 le_result_t admin_SetSource
@@ -520,21 +624,42 @@ le_result_t admin_SetSource
 )
 //--------------------------------------------------------------------------------------------------
 {
-    resTree_EntryRef_t destEntry = resTree_GetResource(resTree_GetRoot(), destPath);
-    if (destEntry == NULL)
+    le_result_t ret = LE_OK;
+    bool createdDestEntry;
+    resTree_EntryRef_t srcEntry = NULL;
+    resTree_EntryRef_t destEntry = resTree_FindEntry(resTree_GetRoot(), destPath);
+    if (destEntry)
     {
-        return LE_BAD_PARAMETER;
+        createdDestEntry = false;
     }
-
-    resTree_EntryRef_t srcEntry = resTree_GetResource(resTree_GetRoot(), srcPath);
-
-    if (srcEntry == NULL)
+    else
     {
-        return LE_BAD_PARAMETER;
+        ret = resTree_GetResource(resTree_GetRoot(), destPath, &destEntry);
+        if (ret == LE_OK)
+        {
+            createdDestEntry = true;
+        }
+    }
+    if (ret == LE_OK)
+    {
+        ret = resTree_GetResource(resTree_GetRoot(), srcPath, &srcEntry);
     }
 
     // Set the source.
-    return resTree_SetSource(destEntry, srcEntry);
+    if (ret == LE_OK)
+    {
+        ret = resTree_SetSource(destEntry, srcEntry);
+    }
+    if (ret != LE_OK)
+    {
+        LE_ERROR("Failed to create a data flow route from %s to %s", srcPath, destPath);
+        if (createdDestEntry)
+        {
+            // Need to clean up destEntry if it was created above.
+            le_mem_Release(destEntry);
+        }
+    }
+    return ret;
 }
 
 
@@ -616,7 +741,6 @@ void admin_RemoveSource
     }
 }
 
-
 //--------------------------------------------------------------------------------------------------
 /**
  * Get a reference to an Observation entry in the resource tree.
@@ -639,8 +763,15 @@ static resTree_EntryRef_t GetObservation
     {
         return NULL;
     }
-
-    return resTree_GetObservation(GetObsNamespace(), path);
+    resTree_EntryRef_t entryRef;
+    if (resTree_GetObservation(GetObsNamespace(), path, &entryRef) == LE_OK)
+    {
+        return entryRef;
+    }
+    else
+    {
+        return NULL;
+    }
 }
 
 
@@ -683,8 +814,8 @@ static resTree_EntryRef_t FindObservation
  * Create an Observation in the /obs/ namespace.
  *
  *  @return
- *  - LE_OK if the observation was created or it already existed.
- *  - LE_BAD_PARAMETER if the path is invalid.
+ *  - LE_OK If the observation was created or it already existed.
+ *  - LE_FAULT If failed to create observation.
  */
 //--------------------------------------------------------------------------------------------------
 le_result_t admin_CreateObs
@@ -697,7 +828,7 @@ le_result_t admin_CreateObs
     resTree_EntryRef_t obs = GetObservation(path);
     if (obs == NULL)
     {
-        return LE_BAD_PARAMETER;
+        return LE_FAULT;
     }
 
     return LE_OK;
@@ -735,9 +866,13 @@ void admin_DeleteObs
  * Set the minimum period between data samples accepted by a given Observation.
  *
  * This is used to throttle the rate of data passing into and through an Observation.
+ *
+ * @return
+ *      - LE_OK If minimum period was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetMinPeriod
+le_result_t admin_SetMinPeriod
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -750,11 +885,13 @@ void admin_SetMinPeriod
 
     if (obsEntry == NULL)
     {
-        LE_ERROR("Malformed observation path '%s'.", path);
+        LE_ERROR("Failed to get observation on path '%s'.", path);
+        return LE_FAULT;
     }
     else
     {
         resTree_SetMinPeriod(obsEntry, minPeriod);
+        return LE_OK;
     }
 }
 
@@ -791,9 +928,13 @@ double admin_GetMinPeriod
  * Set the highest value in a range that will be accepted by a given Observation.
  *
  * Ignored for all non-numeric types except Boolean for which non-zero = true and zero = false.
+ *
+ * @return
+ *      - LE_OK If high limit was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetHighLimit
+le_result_t admin_SetHighLimit
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -806,11 +947,13 @@ void admin_SetHighLimit
 
     if (obsEntry == NULL)
     {
-        LE_ERROR("Malformed observation path '%s'.", path);
+        LE_ERROR("Failed to get observation on path '%s'.", path);
+        return LE_FAULT;
     }
     else
     {
         resTree_SetHighLimit(obsEntry, highLimit);
+        return LE_OK;
     }
 }
 
@@ -847,9 +990,13 @@ double admin_GetHighLimit
  * Set the lowest value in a range that will be accepted by a given Observation.
  *
  * Ignored for all non-numeric types except Boolean for which non-zero = true and zero = false.
+ *
+ * @return
+ *      - LE_OK If low limit was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetLowLimit
+le_result_t admin_SetLowLimit
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -862,11 +1009,13 @@ void admin_SetLowLimit
 
     if (obsEntry == NULL)
     {
-        LE_ERROR("Malformed observation path '%s'.", path);
+        LE_ERROR("Failed to get observation on path '%s'.", path);
+        return LE_FAULT;
     }
     else
     {
         resTree_SetLowLimit(obsEntry, lowLimit);
+        return LE_OK;
     }
 }
 
@@ -906,9 +1055,13 @@ double admin_GetLowLimit
  * Ignored for trigger types.
  *
  * For all other types, any non-zero value means accept any change, but drop if the same as current.
+ *
+ * @return
+ *      - LE_OK If change by magnitude was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetChangeBy
+le_result_t admin_SetChangeBy
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -921,11 +1074,13 @@ void admin_SetChangeBy
 
     if (obsEntry == NULL)
     {
-        LE_ERROR("Malformed observation path '%s'.", path);
+        LE_ERROR("Failed to get observation on path '%s'.", path);
+        return LE_FAULT;
     }
     else
     {
         resTree_SetChangeBy(obsEntry, change);
+        return LE_OK;
     }
 }
 
@@ -964,9 +1119,13 @@ double admin_GetChangeBy
  * transform
  *
  * Ignored for all non-numeric types except Boolean for which non-zero = true and zero = false.
+ *
+ * @return
+ *      - LE_OK If transfrom was done successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetTransform
+le_result_t admin_SetTransform
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -983,11 +1142,13 @@ void admin_SetTransform
 
     if (obsEntry == NULL)
     {
-        LE_ERROR("Malformed observation path '%s'.", path);
+        LE_ERROR("Failed to get observation on path '%s'.", path);
+        return LE_FAULT;
     }
     else
     {
         resTree_SetTransform(obsEntry, transformType, paramsPtr, paramsSize);
+        return LE_OK;
     }
 }
 
@@ -1010,7 +1171,7 @@ admin_TransformType_t admin_GetTransform
 
     if (obsEntry == NULL)
     {
-        LE_ERROR("Malformed observation path '%s'.", path);
+        LE_ERROR("Failed to get observation on path '%s'.", path);
         return ADMIN_OBS_TRANSFORM_TYPE_NONE;
     }
     else
@@ -1027,9 +1188,13 @@ admin_TransformType_t admin_GetTransform
  *
  * If this is set, all non-JSON data will be ignored, and all JSON data that does not contain the
  * the specified object member or array element will also be ignored.
+ *
+ * @return
+ *      - LE_OK If JSON extraction was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetJsonExtraction
+le_result_t admin_SetJsonExtraction
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -1042,11 +1207,13 @@ void admin_SetJsonExtraction
 
     if (obsEntry == NULL)
     {
-        LE_ERROR("Malformed observation path '%s'.", path);
+        LE_ERROR("Failed to get observation on path '%s'.", path);
+        return LE_FAULT;
     }
     else
     {
         resTree_SetJsonExtraction(obsEntry, extractionSpec);
+        return LE_OK;
     }
 }
 
@@ -1097,9 +1264,13 @@ le_result_t admin_GetJsonExtraction
 /**
  * Set the maximum number of data samples to buffer in a given Observation.  Buffers are FIFO
  * circular buffers. When full, the buffer drops the oldest value to make room for a new addition.
+ *
+ * @return
+ *      - LE_OK If max buffer count was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetBufferMaxCount
+le_result_t admin_SetBufferMaxCount
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -1112,11 +1283,13 @@ void admin_SetBufferMaxCount
 
     if (obsEntry == NULL)
     {
-        LE_ERROR("Malformed observation path '%s'.", path);
+        LE_ERROR("Failed to get observation on path '%s'.", path);
+        return LE_FAULT;
     }
     else
     {
         resTree_SetBufferMaxCount(obsEntry, count);
+        return LE_OK;
     }
 }
 
@@ -1154,9 +1327,13 @@ uint32_t admin_GetBufferMaxCount
  * If the buffer's size is non-zero and the backup period is non-zero, then the buffer will be
  * backed-up to non-volatile storage when it changes, but never more often than this period setting
  * specifies.
+ *
+ * @return
+ *      - LE_OK If buffer backup period was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetBufferBackupPeriod
+le_result_t admin_SetBufferBackupPeriod
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -1169,11 +1346,13 @@ void admin_SetBufferBackupPeriod
 
     if (obsEntry == NULL)
     {
-        LE_ERROR("Malformed observation path '%s'.", path);
+        LE_ERROR("Failed to get observation on path '%s'.", path);
+        return LE_FAULT;
     }
     else
     {
         resTree_SetBufferBackupPeriod(obsEntry, seconds);
+        return LE_OK;
     }
 }
 
@@ -1240,9 +1419,15 @@ bool admin_IsMandatory
  *
  * @note Default will be discarded by an Input or Output resource if the default's data type
  *       does not match the data type of the Input or Output.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If setting default failed because of failure to allocate memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-static void SetDefault
+static le_result_t SetDefault
 (
     const char* path, ///< [IN] Absolute path of the resource.
     io_DataType_t dataType,
@@ -1250,26 +1435,34 @@ static void SetDefault
 )
 //--------------------------------------------------------------------------------------------------
 {
-    resTree_EntryRef_t resEntry = resTree_GetResource(resTree_GetRoot(), path);
+    resTree_EntryRef_t resEntry;
+    le_result_t ret = resTree_GetResource(resTree_GetRoot(), path, &resEntry);
 
-    if (resEntry == NULL)
+    if (ret != LE_OK)
     {
-        LE_ERROR("Malformed resource path '%s'.", path);
+        LE_ERROR("Failed to get resource at '%s'.", path);
         le_mem_Release(value);
     }
     else
     {
-        resTree_SetDefault(resEntry, dataType, value);
+        ret = resTree_SetDefault(resEntry, dataType, value);
     }
+    return ret;
 }
 
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a Boolean value.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetBooleanDefault
+le_result_t admin_SetBooleanDefault
 (
     const char* path,
         ///< [IN] Absolute path of the resource.
@@ -1278,16 +1471,33 @@ void admin_SetBooleanDefault
 )
 //--------------------------------------------------------------------------------------------------
 {
-    SetDefault(path, IO_DATA_TYPE_BOOLEAN, dataSample_CreateBoolean(0, value));
+    dataSample_Ref_t dataSampleRef = dataSample_CreateBoolean(0, value);
+    le_result_t ret;
+    if (dataSampleRef)
+    {
+        ret = SetDefault(path, IO_DATA_TYPE_BOOLEAN, dataSampleRef);
+    }
+    else
+    {
+        LE_ERROR("Failed to set default boolean value on path:'%s'", path);
+        ret = LE_NO_MEMORY;
+    }
+    return ret;
 }
 
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a numeric value.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetNumericDefault
+le_result_t admin_SetNumericDefault
 (
     const char* path,
         ///< [IN] Absolute path of the resource.
@@ -1296,16 +1506,33 @@ void admin_SetNumericDefault
 )
 //--------------------------------------------------------------------------------------------------
 {
-    SetDefault(path, IO_DATA_TYPE_NUMERIC, dataSample_CreateNumeric(0, value));
+    dataSample_Ref_t dataSampleRef = dataSample_CreateNumeric(0, value);
+    le_result_t ret;
+    if (dataSampleRef)
+    {
+        ret = SetDefault(path, IO_DATA_TYPE_NUMERIC, dataSampleRef);
+    }
+    else
+    {
+        LE_ERROR("Failed to set default numeric value on path:'%s'", path);
+        ret = LE_NO_MEMORY;
+    }
+    return ret;
 }
 
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a string value.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetStringDefault
+le_result_t admin_SetStringDefault
 (
     const char* path,
         ///< [IN] Absolute path of the resource.
@@ -1314,16 +1541,34 @@ void admin_SetStringDefault
 )
 //--------------------------------------------------------------------------------------------------
 {
-    SetDefault(path, IO_DATA_TYPE_STRING, dataSample_CreateString(0, value));
+    dataSample_Ref_t dataSampleRef = dataSample_CreateString(0, value);
+    le_result_t ret;
+    if (dataSampleRef)
+    {
+        ret = SetDefault(path, IO_DATA_TYPE_STRING, dataSampleRef);
+    }
+    else
+    {
+        LE_ERROR("Failed to set default string value on path:'%s'", path);
+        ret = LE_NO_MEMORY;
+    }
+    return ret;
 }
 
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a JSON value.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch or JSON is
+ *             invalid.
+ *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetJsonDefault
+le_result_t admin_SetJsonDefault
 (
     const char* path,
         ///< [IN] Absolute path of the resource.
@@ -1332,14 +1577,26 @@ void admin_SetJsonDefault
 )
 //--------------------------------------------------------------------------------------------------
 {
+    le_result_t ret;
     if (json_IsValid(value))
     {
-        SetDefault(path, IO_DATA_TYPE_JSON, dataSample_CreateJson(0, value));
+        dataSample_Ref_t dataSampleRef = dataSample_CreateJson(0, value);
+        if (dataSampleRef)
+        {
+            ret = SetDefault(path, IO_DATA_TYPE_JSON, dataSampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to set default JSON value on path:'%s'", path);
+            ret = LE_NO_MEMORY;
+        }
     }
     else
     {
         LE_ERROR("Discarding invalid JSON value '%s'.", value);
+        ret = LE_BAD_PARAMETER;
     }
+    return ret;
 }
 
 
@@ -1582,9 +1839,15 @@ void admin_RemoveDefault
  *
  * @note Override will be discarded by an Input or Output resource if the override's data type
  *       does not match the data type of the Input or Output.
+ *
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-static void SetOverride
+static le_result_t SetOverride
 (
     const char* path, ///< [IN] Absolute path of the resource.
     io_DataType_t dataType,
@@ -1592,17 +1855,18 @@ static void SetOverride
 )
 //--------------------------------------------------------------------------------------------------
 {
-    resTree_EntryRef_t resEntry = resTree_GetResource(resTree_GetRoot(), path);
+    resTree_EntryRef_t resEntry;
+    le_result_t ret = resTree_GetResource(resTree_GetRoot(), path, &resEntry);
 
-    if (resEntry == NULL)
+    if (ret != LE_OK)
     {
-        LE_ERROR("Malformed resource path '%s'.", path);
-        le_mem_Release(value);
+        LE_ERROR("Failed to get resource at '%s'.", path);
     }
     else
     {
-        resTree_SetOverride(resEntry, dataType, value);
+        ret = resTree_SetOverride(resEntry, dataType, value);
     }
+    return ret;
 }
 
 
@@ -1610,11 +1874,14 @@ static void SetOverride
 /**
  * Set an override of Boolean type on a given resource.
  *
- * @note Override will be ignored by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetBooleanOverride
+le_result_t admin_SetBooleanOverride
 (
     const char* path,
         ///< [IN] Absolute path of the resource.
@@ -1623,7 +1890,22 @@ void admin_SetBooleanOverride
 )
 //--------------------------------------------------------------------------------------------------
 {
-    SetOverride(path, IO_DATA_TYPE_BOOLEAN, dataSample_CreateBoolean(0, value));
+    le_result_t ret;
+    dataSample_Ref_t dataSampleRef = dataSample_CreateBoolean(0, value);
+    if (dataSampleRef)
+    {
+        ret = SetOverride(path, IO_DATA_TYPE_BOOLEAN, dataSampleRef);
+        if (ret != LE_OK)
+        {
+            le_mem_Release(dataSampleRef);
+        }
+    }
+    else
+    {
+        LE_ERROR("Failed to set boolean override value on path:'%s'", path);
+        ret = LE_NO_MEMORY;
+    }
+    return ret;
 }
 
 
@@ -1631,11 +1913,14 @@ void admin_SetBooleanOverride
 /**
  * Set an override of numeric type on a given resource.
  *
- * @note Override will be ignored by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetNumericOverride
+le_result_t admin_SetNumericOverride
 (
     const char* path,
         ///< [IN] Absolute path of the resource.
@@ -1644,7 +1929,22 @@ void admin_SetNumericOverride
 )
 //--------------------------------------------------------------------------------------------------
 {
-    SetOverride(path, IO_DATA_TYPE_NUMERIC, dataSample_CreateNumeric(0, value));
+    le_result_t ret;
+    dataSample_Ref_t dataSampleRef = dataSample_CreateNumeric(0, value);
+    if (dataSampleRef)
+    {
+        ret = SetOverride(path, IO_DATA_TYPE_NUMERIC, dataSampleRef);
+        if (ret != LE_OK)
+        {
+            le_mem_Release(dataSampleRef);
+        }
+    }
+    else
+    {
+        LE_ERROR("Failed to set boolean override value on path:'%s'", path);
+        ret = LE_NO_MEMORY;
+    }
+    return ret;
 }
 
 
@@ -1652,11 +1952,14 @@ void admin_SetNumericOverride
 /**
  * Set an override of string type on a given resource.
  *
- * @note Override will be ignored by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetStringOverride
+le_result_t admin_SetStringOverride
 (
     const char* path,
         ///< [IN] Absolute path of the resource.
@@ -1665,7 +1968,22 @@ void admin_SetStringOverride
 )
 //--------------------------------------------------------------------------------------------------
 {
-    SetOverride(path, IO_DATA_TYPE_STRING, dataSample_CreateString(0, value));
+    le_result_t ret;
+    dataSample_Ref_t dataSampleRef = dataSample_CreateString(0, value);
+    if (dataSampleRef)
+    {
+        ret = SetOverride(path, IO_DATA_TYPE_STRING, dataSampleRef);
+        if (ret != LE_OK)
+        {
+            le_mem_Release(dataSampleRef);
+        }
+    }
+    else
+    {
+        LE_ERROR("Failed to set string override value on path:'%s'", path);
+        ret = LE_NO_MEMORY;
+    }
+    return ret;
 }
 
 
@@ -1673,11 +1991,15 @@ void admin_SetStringOverride
 /**
  * Set an override of JSON type on a given resource.
  *
- * @note Override will be ignored by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch or JSON was
+ *              invalid.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-void admin_SetJsonOverride
+le_result_t admin_SetJsonOverride
 (
     const char* path,
         ///< [IN] Absolute path of the resource.
@@ -1686,14 +2008,30 @@ void admin_SetJsonOverride
 )
 //--------------------------------------------------------------------------------------------------
 {
+    le_result_t ret;
     if (json_IsValid(value))
     {
-        SetOverride(path, IO_DATA_TYPE_JSON, dataSample_CreateJson(0, value));
+        dataSample_Ref_t dataSampleRef = dataSample_CreateJson(0, value);
+        if (dataSampleRef)
+        {
+            ret = SetOverride(path, IO_DATA_TYPE_JSON, dataSampleRef);
+            if (ret != LE_OK)
+            {
+                le_mem_Release(dataSampleRef);
+            }
+        }
+        else
+        {
+            LE_ERROR("Failed to set JSON override value on path:'%s'", path);
+            ret = LE_NO_MEMORY;
+        }
     }
     else
     {
         LE_ERROR("Discarding invalid JSON value '%s'.", value);
+        ret = LE_BAD_PARAMETER;
     }
+    return ret;
 }
 
 

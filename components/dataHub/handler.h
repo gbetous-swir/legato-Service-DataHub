@@ -29,7 +29,7 @@ void handler_Init
 /**
  * Add a Handler to a given list.
  *
- * @return Reference to the handler added.
+ * @return Reference to the handler added. NULL if failed to add handler.
  */
 //--------------------------------------------------------------------------------------------------
 hub_HandlerRef_t handler_Add
@@ -45,7 +45,7 @@ hub_HandlerRef_t handler_Add
 /**
  * Remove a Handler from whatever list it is on.
  *
- * @return:
+ * @return
  *      - LE_OK If handler was valid and it was removed successfully.
  *      - LE_FAULT otherwise.
  */

@@ -559,11 +559,21 @@ ENUM TransformType
 /**
  * Push a trigger type data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushTrigger
+FUNCTION le_result_t PushTrigger
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
     double timestamp IN ///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -575,11 +585,21 @@ FUNCTION PushTrigger
 /**
  * Push a Boolean type data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushBoolean
+FUNCTION le_result_t PushBoolean
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
     double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -592,11 +612,21 @@ FUNCTION PushBoolean
 /**
  * Push a numeric type data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushNumeric
+FUNCTION le_result_t PushNumeric
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
     double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -609,11 +639,21 @@ FUNCTION PushNumeric
 /**
  * Push a string type data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushString
+FUNCTION le_result_t PushString
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
     double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -626,11 +666,21 @@ FUNCTION PushString
 /**
  * Push a JSON data sample to a resource.
  *
- * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
- *       Placeholder resource to be created.
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit or JSON is invalid.
+ *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
+ *          created.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushJson
+FUNCTION le_result_t PushJson
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
     double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -778,6 +828,7 @@ EVENT JsonPush
  *  - LE_OK if route already existed or new route was successfully created.
  *  - LE_BAD_PARAMETER if one of the paths is invalid.
  *  - LE_DUPLICATE if the addition of this route would result in a loop.
+ *  - LE_NO_MEMORY if there was a failure in memory allocation.
  */
 //--------------------------------------------------------------------------------------------------
 FUNCTION le_result_t SetSource
@@ -828,7 +879,7 @@ FUNCTION RemoveSource
  *
  *  @return
  *  - LE_OK if the observation was created or it already existed.
- *  - LE_BAD_PARAMETER if the path is invalid.
+ *  - LE_FAULT If failed to create observation.
  */
 //--------------------------------------------------------------------------------------------------
 FUNCTION le_result_t CreateObs
@@ -853,9 +904,13 @@ FUNCTION DeleteObs
  * Set the minimum period between data samples accepted by a given Observation.
  *
  * This is used to throttle the rate of data passing into and through an Observation.
+ *
+ * @return
+ *      - LE_OK If minimum period was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetMinPeriod
+FUNCTION le_result_t SetMinPeriod
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
     double minPeriod IN ///< The minimum period, in seconds.
@@ -880,9 +935,13 @@ FUNCTION double GetMinPeriod
  * Set the highest value in a range that will be accepted by a given Observation.
  *
  * Ignored for all non-numeric types except Boolean for which non-zero = true and zero = false.
+ *
+ * @return
+ *      - LE_OK If high limit was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetHighLimit
+FUNCTION le_result_t SetHighLimit
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
     double highLimit IN ///< The highest value in the range, or NAN (not a number) to remove limit.
@@ -907,9 +966,13 @@ FUNCTION double GetHighLimit
  * Set the lowest value in a range that will be accepted by a given Observation.
  *
  * Ignored for all non-numeric types except Boolean for which non-zero = true and zero = false.
+ *
+ * @return
+ *      - LE_OK If low limit was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetLowLimit
+FUNCTION le_result_t SetLowLimit
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
     double lowLimit IN ///< The lowest value in the range, or NAN (not a number) to remove limit.
@@ -937,9 +1000,13 @@ FUNCTION double GetLowLimit
  * Ignored for trigger types.
  *
  * For all other types, any non-zero value means accept any change, but drop if the same as current.
+ *
+ * @return
+ *      - LE_OK If change by magnitude was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetChangeBy
+FUNCTION le_result_t SetChangeBy
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
     double change IN ///< The magnitude, or either zero or NAN (not a number) to remove limit.
@@ -966,9 +1033,13 @@ FUNCTION double GetChangeBy
  * the output of the transform
  *
  * Ignored for all non-numeric types except Boolean for which non-zero = true and zero = false.
+ *
+ * @return
+ *      - LE_OK If transfrom was done successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetTransform
+FUNCTION le_result_t SetTransform
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN,   ///< Path within the /obs/ namespace.
     TransformType transformType IN,             ///< Type of transform to apply
@@ -998,9 +1069,13 @@ FUNCTION TransformType GetTransform
  * the specified object member or array element will also be ignored.
  *
  * To clear, set to an empty string.
+ *
+ * @return
+ *      - LE_OK If JSON extraction was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetJsonExtraction
+FUNCTION le_result_t SetJsonExtraction
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
     string extractionSpec[MAX_JSON_EXTRACTOR_LEN] IN ///< str specifying member/element to extract.
@@ -1029,9 +1104,13 @@ FUNCTION le_result_t GetJsonExtraction
 /**
  * Set the maximum number of data samples to buffer in a given Observation.  Buffers are FIFO
  * circular buffers. When full, the buffer drops the oldest value to make room for a new addition.
+ *
+ * @return
+ *      - LE_OK If max buffer count was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetBufferMaxCount
+FUNCTION le_result_t SetBufferMaxCount
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
     uint32 count IN ///< The number of samples to buffer (0 = remove setting).
@@ -1057,9 +1136,13 @@ FUNCTION uint32 GetBufferMaxCount
  * If the buffer's size is non-zero and the backup period is non-zero, then the buffer will be
  * backed-up to non-volatile storage when it changes, but never more often than this period setting
  * specifies.
+ *
+ * @return
+ *      - LE_OK If buffer backup period was set successfully.
+ *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetBufferBackupPeriod
+FUNCTION le_result_t SetBufferBackupPeriod
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
     uint32 seconds IN ///< The minimum number of seconds between backups (0 = disable backups)
@@ -1084,9 +1167,15 @@ FUNCTION uint32 GetBufferBackupPeriod
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a Boolean value.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetBooleanDefault
+FUNCTION le_result_t SetBooleanDefault
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
     bool value IN
@@ -1096,9 +1185,15 @@ FUNCTION SetBooleanDefault
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a numeric value.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetNumericDefault
+FUNCTION le_result_t SetNumericDefault
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
     double value IN
@@ -1108,9 +1203,15 @@ FUNCTION SetNumericDefault
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a string value.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetStringDefault
+FUNCTION le_result_t SetStringDefault
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
     string value[io.MAX_STRING_VALUE_LEN] IN
@@ -1120,9 +1221,16 @@ FUNCTION SetStringDefault
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a JSON value.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch or JSON is
+ *             invalid.
+ *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetJsonDefault
+FUNCTION le_result_t SetJsonDefault
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
     string value[io.MAX_STRING_VALUE_LEN] IN
@@ -1232,11 +1340,14 @@ FUNCTION RemoveDefault
 /**
  * Set an override of Boolean type on a given resource.
  *
- * @note Override will be ignored by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetBooleanOverride
+FUNCTION le_result_t SetBooleanOverride
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
     bool value IN
@@ -1247,11 +1358,14 @@ FUNCTION SetBooleanOverride
 /**
  * Set an override of numeric type on a given resource.
  *
- * @note Override will be ignored by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetNumericOverride
+FUNCTION le_result_t SetNumericOverride
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
     double value IN
@@ -1262,11 +1376,14 @@ FUNCTION SetNumericOverride
 /**
  * Set an override of string type on a given resource.
  *
- * @note Override will be ignored by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetStringOverride
+FUNCTION le_result_t SetStringOverride
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
     string value[io.MAX_STRING_VALUE_LEN] IN
@@ -1277,11 +1394,15 @@ FUNCTION SetStringOverride
 /**
  * Set an override of JSON type on a given resource.
  *
- * @note Override will be ignored by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch or JSON was
+ *              invalid.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetJsonOverride
+FUNCTION le_result_t SetJsonOverride
 (
     string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
     string value[io.MAX_STRING_VALUE_LEN] IN

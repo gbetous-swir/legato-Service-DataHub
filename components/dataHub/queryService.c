@@ -414,7 +414,7 @@ le_result_t query_ReadBufferSampleJson
 /**
  * Set the client application's namespace to be used for the following calls
  *
- * @return:
+ * @return
  *  - LE_OK if setting client's namespace was successful.
  *  - LE_DUPLICATE if namespace has already been set.
  *  - LE_NOT_PERMITTED if setting client's namespace is not permitted. Client application's name
@@ -1055,8 +1055,8 @@ static hub_HandlerRef_t AddPushHandler
         return NULL;
     }
 #endif
-    resTree_EntryRef_t resRef = resTree_GetResource(resTree_GetRoot(), path);
-    if (resRef == NULL)
+    resTree_EntryRef_t resRef;
+    if (resTree_GetResource(resTree_GetRoot(), path, &resRef) != LE_OK)
     {
         LE_ERROR("Failed to get resource at '%s'.", path);
         return NULL;

@@ -677,8 +677,13 @@ static void StartRead
         return;
     }
 
-    ReadOperation_t* opPtr = le_mem_Alloc(ReadOperationPool);
-
+    ReadOperation_t* opPtr = hub_MemAlloc(ReadOperationPool);
+    if (opPtr == NULL)
+    {
+        LE_ERROR("Failed to allocate a read operation");
+        handlerPtr(LE_NO_MEMORY, contextPtr);
+        return;
+    }
     opPtr->link = LE_DLS_LINK_INIT;
     le_dls_Queue(&obsPtr->readOpList, &opPtr->link);
 
@@ -706,9 +711,15 @@ static void StartRead
 //--------------------------------------------------------------------------------------------------
 /**
  * Adds a given data sample to the buffer of a given Observation.
+ *
+ * @return
+ *      - LE_OK If datasample was added to observation buffer successfully.
+ *      - LE_NO_MEMORY If failed to allocate memory for the new datasample in Buffer Pool.
+ *      - LE_BAD_PARAMETER If dropped sample because its timestamp was older than the sample already
+ *           in buffer.
  */
 //--------------------------------------------------------------------------------------------------
-static void AddToBuffer
+static le_result_t AddToBuffer
 (
     Observation_t* obsPtr,
     dataSample_Ref_t sampleRef
@@ -733,18 +744,26 @@ static void AddToBuffer
             LE_ERROR("Dropping new sample timestamped %lf (< %lf in buffer)!",
                      newEntryTimestamp,
                      oldEntryTimestamp);
-            return;
+            return LE_BAD_PARAMETER;
         }
     }
 
-    buffEntryPtr = le_mem_Alloc(BufferEntryPool);
+    buffEntryPtr = hub_MemAlloc(BufferEntryPool);
+    if (buffEntryPtr)
+    {
+        le_mem_AddRef(sampleRef);
+        buffEntryPtr->sampleRef = sampleRef;
+        buffEntryPtr->link = LE_SLS_LINK_INIT;
+        le_sls_Queue(&obsPtr->sampleList, &buffEntryPtr->link);
 
-    le_mem_AddRef(sampleRef);
-    buffEntryPtr->sampleRef = sampleRef;
-    buffEntryPtr->link = LE_SLS_LINK_INIT;
-    le_sls_Queue(&obsPtr->sampleList, &buffEntryPtr->link);
-
-    (obsPtr->count)++;
+        (obsPtr->count)++;
+        return LE_OK;
+    }
+    else
+    {
+        LE_ERROR("Failed to allocate a buffer entry");
+        return LE_NO_MEMORY;
+    }
 }
 
 
@@ -776,6 +795,14 @@ static void TruncateBuffer
 //--------------------------------------------------------------------------------------------------
 /**
  * Update the value of a data sample by replacing it, if necessary
+ *
+ * Note: Even though this function uses dataSample_CreateBoolean and dataSample-CreateNumberic which
+ * may return NULL if dataSample pool is exhusted, because the previous sample is always released
+ * first before calling the createSample function, it is expected that creating sample is always
+ * successful.
+ *
+ * @return
+ *      Pointer to the updated sample.
  */
 //--------------------------------------------------------------------------------------------------
 static dataSample_Ref_t UpdateSample
@@ -797,6 +824,7 @@ static dataSample_Ref_t UpdateSample
             bool value = *((double *)valuePtr) > 0.0 ? true : false;
             if (dataSample_GetBoolean(sampleRef) != value)
             {
+                le_mem_Release(sampleRef);
                 sample = dataSample_CreateBoolean(timestamp, value);
             }
             break;
@@ -807,6 +835,7 @@ static dataSample_Ref_t UpdateSample
             double value = *((double *)valuePtr);
             if (dataSample_GetNumeric(sampleRef) != value)
             {
+                le_mem_Release(sampleRef);
                 sample = dataSample_CreateNumeric(timestamp, value);
             }
         }
@@ -815,11 +844,10 @@ static dataSample_Ref_t UpdateSample
             break;
     }
 
-    if (sample != sampleRef)
+    if (!sample)
     {
-        le_mem_Release(sampleRef);
+        LE_FATAL("UpdateSample Failed to allocate a new sample");
     }
-
     return sample;
 }
 
@@ -1189,9 +1217,18 @@ static void ReadSamplesFromFile
         // we will push it to the Observation later when we confirm that the file doesn't have
         // more than expected in it (which would mean that all these samples are probably corrupt
         // and need to be discarded).
-        if (count != 0)
+        if (count != 0 && dataSample)
         {
-            AddToBuffer(obsPtr, dataSample);
+            if (AddToBuffer(obsPtr, dataSample) != LE_OK)
+            {
+                goto error;
+            }
+        }
+        else if (!dataSample)
+        {
+            // Failed to allocate a data sample and therefore cannot proceed with read.
+            LE_ERROR("Failed to allocate dataSample for value read from file");
+            goto error;
         }
     }
 
@@ -1385,7 +1422,7 @@ void obs_Init
  * Create an Observation object.  This allocates the object and initializes the class members,
  * but not the parent class members.
  *
- * @return Pointer to the new object.
+ * @return Pointer to the new object or NULL if failed to allocate an observation.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* obs_Create
@@ -1394,8 +1431,13 @@ res_Resource_t* obs_Create
 )
 //--------------------------------------------------------------------------------------------------
 {
-    Observation_t* obsPtr = le_mem_Alloc(ObservationPool);
+    Observation_t* obsPtr = hub_MemAlloc(ObservationPool);
 
+    if (obsPtr == NULL)
+    {
+        LE_ERROR("Failed to allocate observation");
+        return NULL;
+    }
     res_Construct(&obsPtr->resource, entryRef);
 
     obsPtr->lowLimit = NAN;
@@ -1719,7 +1761,11 @@ void obs_ProcessAccepted
             obsPtr->bufferedType = dataType;
         }
 
-        AddToBuffer(obsPtr, sampleRef);
+        if (AddToBuffer(obsPtr, sampleRef) != LE_OK)
+        {
+            LE_ERROR("Failed to an accepted sample to buffer");
+            return;
+        }
 
         TruncateBuffer(obsPtr, obsPtr->maxCount);
 

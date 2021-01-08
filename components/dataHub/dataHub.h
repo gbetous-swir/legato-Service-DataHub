@@ -64,7 +64,7 @@ const char* hub_GetEntryTypeName
 /**
  * Set the client app's namespace.
  *
- * @return:
+ * @return
  *  - LE_OK if setting client's namespace was successful.
  *  - LE_DUPLICATE if namespace has already been set.
  */
@@ -87,5 +87,29 @@ resTree_EntryRef_t hub_GetClientNamespace
     le_msg_SessionRef_t sessionRef  ///< [IN] IPC session reference.
 );
 
+//--------------------------------------------------------------------------------------------------
+/**
+ *  Allocate memory from a datahub pool
+ *
+ *  Will use either le_mem_TryAlloc or le_mem_Alloc depending on OS.
+ *
+ *  @return
+ *      Pointer to the allocated object or NULL if failed to allocate.
+ */
+//--------------------------------------------------------------------------------------------------
+void* hub_MemAlloc
+(
+    le_mem_PoolRef_t    pool    ///< [IN] Pool from which the object is to be allocated.
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ *  Is resource Path malformed?
+ */
+//--------------------------------------------------------------------------------------------------
+bool hub_IsResourcePathMalformed
+(
+    const char* path
+);
 
 #endif // DATA_HUB_H_INCLUDE_GUARD

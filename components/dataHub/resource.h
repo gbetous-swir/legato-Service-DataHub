@@ -99,7 +99,7 @@ static inline resTree_EntryRef_t res_GetResTreeEntry
 /**
  * Create an Input resource object.
  *
- * @return Ptr to the object.
+ * @return Ptr to the object or NULL if it failed to create an object.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* res_CreateInput
@@ -114,7 +114,7 @@ res_Resource_t* res_CreateInput
 /**
  * Create an Output resource object.
  *
- * @return Ptr to the object.
+ * @return Ptr to the object or NULL if it failed to create an object.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* res_CreateOutput
@@ -129,7 +129,7 @@ res_Resource_t* res_CreateOutput
 /**
  * Create an Observation resource object.
  *
- * @return Ptr to the object.
+ * @return Ptr to the object or NULL if failed to allocate an observation.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* res_CreateObservation
@@ -269,9 +269,16 @@ resTree_EntryRef_t res_GetSource
  * Push a data sample to a resource.
  *
  * @note Takes ownership of the data sample reference.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch if datasample unit.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void res_Push
+le_result_t res_Push
 (
     res_Resource_t* resPtr,    ///< The resource to push to.
     io_DataType_t dataType,         ///< The data type.
@@ -284,7 +291,7 @@ void res_Push
 /**
  * Add a Push Handler to an Output resource.
  *
- * @return Reference to the handler added.
+ * @return Reference to the handler added. NULL if failed to add handler.
  *
  * @note Can be removed by calling handler_Remove().
  */
@@ -567,9 +574,15 @@ bool res_IsMandatory
  *
  * Will be discarded if setting the default value on an Input or Output that doesn't have the
  * same data type.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT Any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void res_SetDefault
+le_result_t res_SetDefault
 (
     res_Resource_t* resPtr,
     io_DataType_t dataType,
@@ -633,9 +646,15 @@ void res_RemoveDefault
  *
  * @note Override will be discarded by an Input or Output resource if the override's data type
  *       does not match the data type of the Input or Output.
+ *
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT Any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void res_SetOverride
+le_result_t res_SetOverride
 (
     res_Resource_t* resPtr,
     io_DataType_t dataType,

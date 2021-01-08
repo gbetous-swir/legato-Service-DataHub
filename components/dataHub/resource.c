@@ -166,7 +166,7 @@ static void SetUnits
 /**
  * Create an Input resource object.
  *
- * @return Ptr to the object.
+ * @return Ptr to the object or NULL if it failed to create an object.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* res_CreateInput
@@ -179,9 +179,11 @@ res_Resource_t* res_CreateInput
 {
     res_Resource_t* resPtr = ioPoint_CreateInput(dataType, entryRef);
 
-    resPtr->currentType = dataType;
-    SetUnits(resPtr, units);
-
+    if (resPtr)
+    {
+        resPtr->currentType = dataType;
+        SetUnits(resPtr, units);
+    }
     return resPtr;
 }
 
@@ -190,7 +192,7 @@ res_Resource_t* res_CreateInput
 /**
  * Create an Output resource object.
  *
- * @return Ptr to the object.
+ * @return Ptr to the object or NULL if it failed to create an object.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* res_CreateOutput
@@ -203,9 +205,11 @@ res_Resource_t* res_CreateOutput
 {
     res_Resource_t* resPtr = ioPoint_CreateOutput(dataType, entryRef);
 
-    resPtr->currentType = dataType;
-    SetUnits(resPtr, units);
-
+    if (resPtr)
+    {
+        resPtr->currentType = dataType;
+        SetUnits(resPtr, units);
+    }
     return resPtr;
 }
 
@@ -214,7 +218,7 @@ res_Resource_t* res_CreateOutput
 /**
  * Create an Observation resource object.
  *
- * @return Ptr to the object.
+ * @return Ptr to the object or NULL if failed to allocate an observation.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* res_CreateObservation
@@ -248,7 +252,7 @@ void res_RestoreBackup
 /**
  * Create a Placeholder resource object.
  *
- * @return Ptr to the object.
+ * @return Ptr to the object, or NULL if failed to create one.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* res_CreatePlaceholder
@@ -257,7 +261,11 @@ res_Resource_t* res_CreatePlaceholder
 )
 //--------------------------------------------------------------------------------------------------
 {
-    res_Resource_t* resPtr = le_mem_Alloc(PlaceholderPool);
+    res_Resource_t* resPtr = hub_MemAlloc(PlaceholderPool);
+    if (resPtr == NULL)
+    {
+        return NULL;
+    }
 
     res_Construct(resPtr, entryRef);
 
@@ -483,9 +491,14 @@ resTree_EntryRef_t res_GetSource
  * out to other resources or apps that have registered to receive Pushes from this resource.
  *
  * @note This function takes ownership of the dataSample reference it is passed.
+ *
+ * @return
+ *      - LE_OK If current value was updated successfully.
+ *      - LE_NO_MEMORY If could not update current value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not update current value due to type or unit mismatch.
  */
 //--------------------------------------------------------------------------------------------------
-static void UpdateCurrentValue
+static le_result_t UpdateCurrentValue
 (
     res_Resource_t* resPtr,         ///< The resource to push to.
     io_DataType_t dataType,         ///< The data type.
@@ -498,14 +511,14 @@ static void UpdateCurrentValue
     // Check for type mismatches.
     if (!IsAcceptable(resPtr, dataType))
     {
-        LE_WARN("Type mismatch: Ignoring '%s' for '%s' resource of type '%s'.",
+        LE_ERROR("Type mismatch: Ignoring '%s' for '%s' resource of type '%s'.",
                 hub_GetDataTypeName(dataType),
                 hub_GetEntryTypeName(entryType),
                 hub_GetDataTypeName(ioPoint_GetDataType(resPtr)));
 
         le_mem_Release(dataSample);
 
-        return;
+        return LE_BAD_PARAMETER;
     }
 
     // Set the current value to the new data sample.
@@ -533,6 +546,8 @@ static void UpdateCurrentValue
         resPtr->jsonExample = NULL;
     }
 
+    le_result_t res = LE_OK;
+
     // Iterate over the list of destination routes, pushing to all of them.
     le_dls_Link_t* linkPtr = le_dls_Peek(&(resPtr->destList));
     while (linkPtr != NULL)
@@ -542,13 +557,25 @@ static void UpdateCurrentValue
         // Increment the reference count before pushing.
         le_mem_AddRef(dataSample);
 
-        res_Push(destPtr, dataType, resPtr->units, dataSample);
+        le_result_t pushRes = res_Push(destPtr, dataType, resPtr->units, dataSample);
+        if (pushRes != LE_OK)
+        {
+            LE_ERROR("Failed to update a value for entry %s with error: %d",
+                     resTree_GetEntryName(destPtr->entryRef), res);
+            if (res == LE_OK || pushRes == LE_NO_MEMORY)
+            {
+                // Latch in error result if a push fails in the middle of processing multiple
+                // destinations.  Precedence: LE_OK < [other errors] < LE_NO_MEMORY
+                res = pushRes;
+            }
+        }
 
         linkPtr = le_dls_PeekNext(&(resPtr->destList), linkPtr);
     }
 
     // Call any the push handlers that match the data type of the sample.
     handler_CallAll(&resPtr->pushHandlerList, dataType, dataSample);
+    return res;
 }
 
 
@@ -557,9 +584,16 @@ static void UpdateCurrentValue
  * Push a data sample to a resource.
  *
  * @note Takes ownership of the data sample reference.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch if datasample unit.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void res_Push
+le_result_t res_Push
 (
     res_Resource_t* resPtr,         ///< The resource to push to.
     io_DataType_t dataType,         ///< The data type.
@@ -581,7 +615,8 @@ void res_Push
         if (obs_DoJsonExtraction(resPtr, &dataType, &dataSample) != LE_OK)
         {
             le_mem_Release(dataSample);
-            return;
+            LE_ERROR("Rejecting push because failed to do JSON extraction on datasample");
+            return LE_FAULT;
         }
 
         // Buffer and possibly backup the sample
@@ -593,7 +628,8 @@ void res_Push
         if (true != obs_ShouldAccept(resPtr, dataType, dataSample))
         {
             le_mem_Release(dataSample);
-            return;
+            LE_ERROR("Rejecting push because datasample should not be accepted");
+            return LE_FAULT;
         }
     }
 
@@ -613,7 +649,7 @@ void res_Push
     {
         LE_WARN("Rejecting pushed value because configuration update is in progress.");
         le_mem_Release(dataSample);
-        return;
+        return LE_IN_PROGRESS;
     }
 
     // If an override is in effect, the current value becomes a new data sample that has
@@ -646,12 +682,17 @@ void res_Push
                         units,
                         resPtr->units);
                 le_mem_Release(dataSample);
-                return;
+                return LE_BAD_PARAMETER;
             }
 
             // Inputs and outputs have a fixed type.  This means that if a different type
             // of value is received, we must do a type conversion before we can accept it.
-            ioPoint_DoTypeCoercion(resPtr, &dataType, &dataSample);
+            le_result_t res = ioPoint_DoTypeCoercion(resPtr, &dataType, &dataSample);
+            if (res != LE_OK)
+            {
+                LE_ERROR("Rejecting push because failed to do type coercion on datasample");
+                return res;
+            }
             break;
 
         case ADMIN_ENTRY_TYPE_OBSERVATION:
@@ -676,7 +717,7 @@ void res_Push
             break;
     }
 
-    UpdateCurrentValue(resPtr, dataType, dataSample);
+    return UpdateCurrentValue(resPtr, dataType, dataSample);
 }
 
 
@@ -684,7 +725,7 @@ void res_Push
 /**
  * Add a Push Handler to an Output resource.
  *
- * @return Reference to the handler added.
+ * @return Reference to the handler added. NULL if failed to add handler.
  *
  * @note Can be removed by calling handler_Remove().
  */
@@ -1224,9 +1265,15 @@ bool res_IsMandatory
  *
  * Will be discarded if setting the default value on an Input or Output that doesn't have the
  * same data type.
+ *
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT Any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void res_SetDefault
+le_result_t res_SetDefault
 (
     res_Resource_t* resPtr,
     io_DataType_t dataType,
@@ -1234,22 +1281,23 @@ void res_SetDefault
 )
 //--------------------------------------------------------------------------------------------------
 {
+    le_result_t ret;
     if (resPtr->defaultValue != NULL)
     {
         le_mem_Release(resPtr->defaultValue);
     }
 
-    resPtr->defaultValue = value;
-    resPtr->defaultType = dataType;
-
     if (!IsAcceptable(resPtr, dataType))
     {
-        LE_WARN("Setting default value to incompatible data type %s on resource of type %s.",
+        LE_ERROR("Setting default value to incompatible data type %s on resource of type %s.",
                 hub_GetDataTypeName(dataType),
                 hub_GetDataTypeName(resPtr->currentType));
+        ret = LE_BAD_PARAMETER;
     }
     else
     {
+        resPtr->defaultValue = value;
+        resPtr->defaultType = dataType;
         // If this resource is currently operating on its default value
         // (doesn't have a compatible override or pushed value), update
         // the current value to this value.
@@ -1258,9 +1306,15 @@ void res_SetDefault
                 || (!IsAcceptable(resPtr, resPtr->pushedType))  )  )
         {
             le_mem_AddRef(value);
-            UpdateCurrentValue(resPtr, dataType, value);
+            ret = UpdateCurrentValue(resPtr, dataType, value);
+        }
+        else
+        {
+            ret = LE_FAULT;
+            LE_ERROR("Failed to update default value");
         }
     }
+    return ret;
 }
 
 
@@ -1344,9 +1398,15 @@ void res_RemoveDefault
  *
  * @note Override will be discarded by an Input or Output resource if the override's data type
  *       does not match the data type of the Input or Output.
+ *
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT Any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void res_SetOverride
+le_result_t res_SetOverride
 (
     res_Resource_t* resPtr,
     io_DataType_t dataType,
@@ -1354,6 +1414,7 @@ void res_SetOverride
 )
 //--------------------------------------------------------------------------------------------------
 {
+    le_result_t ret;
     if (resPtr->overrideValue != NULL)
     {
         le_mem_Release(resPtr->overrideValue);
@@ -1366,13 +1427,15 @@ void res_SetOverride
         LE_WARN("Setting override to incompatible data type %s on resource of type %s.",
                 hub_GetDataTypeName(dataType),
                 hub_GetDataTypeName(resPtr->currentType));
+        ret = LE_BAD_PARAMETER;
     }
     else
     {
         // Update the current value to this value now.
         le_mem_AddRef(value);
-        UpdateCurrentValue(resPtr, dataType, value);
+        ret = UpdateCurrentValue(resPtr, dataType, value);
     }
+    return ret;
 }
 
 

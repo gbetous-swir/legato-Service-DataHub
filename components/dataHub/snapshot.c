@@ -159,18 +159,30 @@ bool snapshot_IsTimely
 //--------------------------------------------------------------------------------------------------
 /*
  *  Push a parent node reference onto the stack as we descend to a child.
+ *
+ *  @return
+ *      - LE_OK IF parent was pushed successfully.
+ *      - LE_NO_MEMORY If failed to allocate memory for parent.
  */
 //--------------------------------------------------------------------------------------------------
-static void PushParent
+static le_result_t PushParent
 (
     resTree_EntryRef_t parentRef    ///< New parent to push onto the stack.
 )
 {
-    Parent_t *entry = le_mem_Alloc(NodeParentPool);
-    entry->link = LE_SLS_LINK_INIT;
-    entry->nodeRef = parentRef;
+    Parent_t *entry = hub_MemAlloc(NodeParentPool);
+    if (entry != NULL)
+    {
+        entry->link = LE_SLS_LINK_INIT;
+        entry->nodeRef = parentRef;
 
-    le_sls_Stack(&Parents, &entry->link);
+        le_sls_Stack(&Parents, &entry->link);
+        return LE_OK;
+    }
+    else
+    {
+        return LE_NO_MEMORY;
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -251,7 +263,11 @@ static void NodeChildren
 
     LE_DEBUG("Handling node children");
 
-    PushParent(Snapshot.nodeRef);
+    le_result_t res = PushParent(Snapshot.nodeRef);
+    if (res != LE_OK)
+    {
+        snapshot_End(res);
+    }
     Snapshot.nodeRef = resTree_GetFirstChildEx(
                             Snapshot.nodeRef,
                             Snapshot.formatter->filter & SNAPSHOT_FILTER_DELETED);

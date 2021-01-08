@@ -90,7 +90,7 @@ static resTree_EntryRef_t FindResource
 /**
  * Set the client application's namespace to be used for the following calls
  *
- * @return:
+ * @return
  *  - LE_OK if setting client's namespace was successful.
  *  - LE_DUPLICATE if namespace has already been set.
  *  - LE_NOT_PERMITTED if setting client's namespace is not permitted. Client application's name
@@ -180,11 +180,12 @@ le_result_t io_CreateInput
     }
 
     // Get/Create the Input resource.
-    resRef = resTree_GetInput(nsRef, path, dataType, units);
-    if (resRef == NULL)
+    le_result_t res = resTree_GetInput(nsRef, path, dataType, units, &resRef);
+
+    if (resRef == NULL || res != LE_OK)
     {
         LE_ERROR("Failed to create Input '/app/%s/%s'.", resTree_GetEntryName(nsRef), path);
-        return LE_FAULT;
+        return res;
     }
 
     return LE_OK;
@@ -302,11 +303,11 @@ le_result_t io_CreateOutput
     }
 
     // Create the Output resource.
-    resRef = resTree_GetOutput(nsRef, path, dataType, units);
-    if (resRef == NULL)
+    le_result_t res = resTree_GetOutput(nsRef, path, dataType, units, &resRef);
+    if (resRef == NULL || res != LE_OK)
     {
         LE_ERROR("Failed to create Output '/app/%s/%s'.", resTree_GetEntryName(nsRef), path);
-        return LE_FAULT;
+        return res;
     }
 
     return LE_OK;
@@ -318,9 +319,13 @@ le_result_t io_CreateOutput
  * Delete a resource.
  *
  * Does nothing if the resource doesn't exist.
+ *
+ * @return
+ *      - LE_OK if resource was deleted successfully.
+ *      - LE_NOT_FOUND if resource was not found.
  */
 //--------------------------------------------------------------------------------------------------
-void io_DeleteResource
+le_result_t io_DeleteResource
 (
     const char* path
         ///< [IN] Resource path within the client app's namespace.
@@ -334,6 +339,11 @@ void io_DeleteResource
     if (resRef != NULL)
     {
         resTree_DeleteIO(resRef);
+        return LE_OK;
+    }
+    else
+    {
+        return LE_NOT_FOUND;
     }
 }
 
@@ -341,9 +351,21 @@ void io_DeleteResource
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a trigger type data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void io_PushTrigger
+le_result_t io_PushTrigger
 (
     const char* path,
         ///< [IN] Resource path within the client app's namespace.
@@ -354,17 +376,29 @@ void io_PushTrigger
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t resRef = FindResource(path);
+    le_result_t ret;
     if (resRef == NULL)
     {
         LE_ERROR("Client tried to push data to a non-existent resource '%s'.", path);
-        return;
+        ret = LE_NOT_FOUND;
     }
+    else
+    {
+        // Create a Data Sample object for this new sample.
+        dataSample_Ref_t sampleRef = dataSample_CreateTrigger(timestamp);
 
-    // Create a Data Sample object for this new sample.
-    dataSample_Ref_t sampleRef = dataSample_CreateTrigger(timestamp);
-
-    // Push the sample to the Resource.
-    resTree_Push(resRef, IO_DATA_TYPE_TRIGGER, sampleRef);
+        if (sampleRef)
+        {
+            // Push the sample to the Resource.
+            ret = resTree_Push(resRef, IO_DATA_TYPE_TRIGGER, sampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to push trigger to path '%s'", path);
+            ret = LE_NO_MEMORY;
+        }
+    }
+    return ret;
 }
 
 
@@ -372,9 +406,21 @@ void io_PushTrigger
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a Boolean type data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void io_PushBoolean
+le_result_t io_PushBoolean
 (
     const char* path,
         ///< [IN] Resource path within the client app's namespace.
@@ -387,17 +433,29 @@ void io_PushBoolean
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t resRef = FindResource(path);
+    le_result_t ret;
     if (resRef == NULL)
     {
         LE_ERROR("Client tried to push data to a non-existent resource '%s'.", path);
-        return;
+        ret = LE_NOT_FOUND;
     }
+    else
+    {
+        // Create a Data Sample object for this new sample.
+        dataSample_Ref_t sampleRef = dataSample_CreateBoolean(timestamp, value);
 
-    // Create a Data Sample object for this new sample.
-    dataSample_Ref_t sampleRef = dataSample_CreateBoolean(timestamp, value);
-
-    // Push the sample to the Resource.
-    resTree_Push(resRef, IO_DATA_TYPE_BOOLEAN, sampleRef);
+        if (sampleRef)
+        {
+            // Push the sample to the Resource.
+            ret = resTree_Push(resRef, IO_DATA_TYPE_BOOLEAN, sampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to push boolean to path '%s'", path);
+            ret = LE_NO_MEMORY;
+        }
+    }
+    return ret;
 }
 
 
@@ -405,9 +463,21 @@ void io_PushBoolean
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a numeric type data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void io_PushNumeric
+le_result_t io_PushNumeric
 (
     const char* path,
         ///< [IN] Resource path within the client app's namespace.
@@ -420,17 +490,29 @@ void io_PushNumeric
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t resRef = FindResource(path);
+    le_result_t ret;
     if (resRef == NULL)
     {
         LE_ERROR("Client tried to push data to a non-existent resource '%s'.", path);
-        return;
+        ret = LE_NOT_FOUND;
     }
+    else
+    {
+        // Create a Data Sample object for this new sample.
+        dataSample_Ref_t sampleRef = dataSample_CreateNumeric(timestamp, value);
 
-    // Create a Data Sample object for this new sample.
-    dataSample_Ref_t sampleRef = dataSample_CreateNumeric(timestamp, value);
-
-    // Push the sample to the Resource.
-    resTree_Push(resRef, IO_DATA_TYPE_NUMERIC, sampleRef);
+        if (sampleRef)
+        {
+            // Push the sample to the Resource.
+            ret = resTree_Push(resRef, IO_DATA_TYPE_NUMERIC, sampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to push numeric to path '%s'", path);
+            ret = LE_NO_MEMORY;
+        }
+    }
+    return ret;
 }
 
 
@@ -438,9 +520,21 @@ void io_PushNumeric
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a string type data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void io_PushString
+le_result_t io_PushString
 (
     const char* path,
         ///< [IN] Resource path within the client app's namespace.
@@ -453,26 +547,50 @@ void io_PushString
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t resRef = FindResource(path);
+    le_result_t ret;
     if (resRef == NULL)
     {
         LE_ERROR("Client tried to push data to a non-existent resource '%s'.", path);
-        return;
+        ret = LE_NOT_FOUND;
     }
+    else
+    {
+        // Create a Data Sample object for this new sample.
+        dataSample_Ref_t sampleRef = dataSample_CreateString(timestamp, value);
 
-    // Create a Data Sample object for this new sample.
-    dataSample_Ref_t sampleRef = dataSample_CreateString(timestamp, value);
-
-    // Push the sample to the Resource.
-    resTree_Push(resRef, IO_DATA_TYPE_STRING, sampleRef);
+        if (sampleRef)
+        {
+            // Push the sample to the Resource.
+            ret = resTree_Push(resRef, IO_DATA_TYPE_STRING, sampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to push string to path '%s'", path);
+            ret = LE_NO_MEMORY;
+        }
+    }
+    return ret;
 }
 
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a JSON data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit or JSON is not valid.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void io_PushJson
+le_result_t io_PushJson
 (
     const char* path,
         ///< [IN] Resource path within the client app's namespace.
@@ -485,24 +603,34 @@ void io_PushJson
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t resRef = FindResource(path);
+    le_result_t ret;
     if (resRef == NULL)
     {
         LE_ERROR("Client tried to push data to a non-existent resource '%s'.", path);
-        return;
+        ret = LE_NOT_FOUND;
     }
-
-    if (json_IsValid(value))
+    else if (json_IsValid(value))
     {
         // Create a Data Sample object for this new sample.
         dataSample_Ref_t sampleRef = dataSample_CreateJson(timestamp, value);
 
-        // Push the sample to the Resource.
-        resTree_Push(resRef, IO_DATA_TYPE_JSON, sampleRef);
+        if (sampleRef)
+        {
+            // Push the sample to the Resource.
+            ret = resTree_Push(resRef, IO_DATA_TYPE_JSON, sampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to push JSON to path '%s'", path);
+            ret = LE_NO_MEMORY;
+        }
     }
     else
     {
         LE_WARN("Rejecting invalid JSON string '%s'.", value);
+        ret = LE_BAD_PARAMETER;
     }
+    return ret;
 }
 
 
@@ -813,11 +941,11 @@ void io_MarkOptional
     resTree_EntryRef_t resRef = FindResource(path);
     if (resRef == NULL)
     {
-        LE_KILL_CLIENT("Attempt to mark non-existent resource optional at '%s'.", path);
+        LE_ERROR("Attempt to mark non-existent resource optional at '%s'.", path);
     }
     else if (resTree_GetEntryType(resRef) != ADMIN_ENTRY_TYPE_OUTPUT)
     {
-        LE_KILL_CLIENT("Attempt to mark non-Output resource optional at '%s'.", path);
+        LE_ERROR("Attempt to mark non-Output resource optional at '%s'.", path);
     }
     else
     {
@@ -830,10 +958,16 @@ void io_MarkOptional
 /**
  * Set a Boolean type value as the default value of a given resource.
  *
- * @note This will be ignored if the resource already has a default value.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NOT_FOUND If path does not exist.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_DUPLICATE If resource already has a default value.
+ *      - LE_FAULT For any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void io_SetBooleanDefault
+le_result_t io_SetBooleanDefault
 (
     const char* path,
         ///< [IN] Resource path within the client app's namespace.
@@ -843,21 +977,37 @@ void io_SetBooleanDefault
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t resRef = FindResource(path);
+    le_result_t ret;
     if (resRef == NULL)
     {
-        LE_KILL_CLIENT("Attempt to set default value of non-existent resource '%s'.", path);
+        LE_ERROR("Attempt to set default value of non-existent resource '%s'.", path);
+        ret = LE_NOT_FOUND;
     }
     else if (resTree_GetDataType(resRef) != IO_DATA_TYPE_BOOLEAN)
     {
-        LE_KILL_CLIENT("Attempt to set default value to wrong type for resource '%s'.", path);
+        LE_ERROR("Attempt to set default value to wrong type for resource '%s'.", path);
+        ret = LE_BAD_PARAMETER;
     }
     else if (!resTree_HasDefault(resRef))
     {
         // Create a Data Sample object for this new sample.
         dataSample_Ref_t sampleRef = dataSample_CreateBoolean(0.0, value);
 
-        resTree_SetDefault(resRef, IO_DATA_TYPE_BOOLEAN, sampleRef);
+        if (sampleRef)
+        {
+            ret = resTree_SetDefault(resRef, IO_DATA_TYPE_BOOLEAN, sampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to set default boolean to path '%s'", path);
+            ret = LE_NO_MEMORY;
+        }
     }
+    else
+    {
+        ret = LE_DUPLICATE;
+    }
+    return ret;
 }
 
 
@@ -865,10 +1015,16 @@ void io_SetBooleanDefault
 /**
  * Set a numeric type value as the default value of a given resource.
  *
- * @note This will be ignored if the resource already has a default value.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NOT_FOUND If path does not exist.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_DUPLICATE If resource already has a default value.
+ *      - LE_FAULT For any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void io_SetNumericDefault
+le_result_t io_SetNumericDefault
 (
     const char* path,
         ///< [IN] Resource path within the client app's namespace.
@@ -878,21 +1034,37 @@ void io_SetNumericDefault
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t resRef = FindResource(path);
+    le_result_t ret;
     if (resRef == NULL)
     {
-        LE_KILL_CLIENT("Attempt to set default value of non-existent resource '%s'.", path);
+        LE_ERROR("Attempt to set default value of non-existent resource '%s'.", path);
+        ret = LE_NOT_FOUND;
     }
     else if (resTree_GetDataType(resRef) != IO_DATA_TYPE_NUMERIC)
     {
-        LE_KILL_CLIENT("Attempt to set default value to wrong type for resource '%s'.", path);
+        LE_ERROR("Attempt to set default value to wrong type for resource '%s'.", path);
+        ret = LE_BAD_PARAMETER;
     }
     else if (!resTree_HasDefault(resRef))
     {
         // Create a Data Sample object for this new sample.
         dataSample_Ref_t sampleRef = dataSample_CreateNumeric(0.0, value);
 
-        resTree_SetDefault(resRef, IO_DATA_TYPE_NUMERIC, sampleRef);
+        if (sampleRef)
+        {
+            ret = resTree_SetDefault(resRef, IO_DATA_TYPE_NUMERIC, sampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to set default numeric to path '%s'", path);
+            ret = LE_NO_MEMORY;
+        }
     }
+    else
+    {
+        ret = LE_DUPLICATE;
+    }
+    return ret;
 }
 
 
@@ -900,10 +1072,16 @@ void io_SetNumericDefault
 /**
  * Set a string type value as the default value of a given resource.
  *
- * @note This will be ignored if the resource already has a default value.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NOT_FOUND If path does not exist.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_DUPLICATE If resource already has a default value.
+ *      - LE_FAULT For any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void io_SetStringDefault
+le_result_t io_SetStringDefault
 (
     const char* path,
         ///< [IN] Resource path within the client app's namespace.
@@ -913,21 +1091,37 @@ void io_SetStringDefault
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t resRef = FindResource(path);
+    le_result_t ret;
     if (resRef == NULL)
     {
-        LE_KILL_CLIENT("Attempt to set default value of non-existent resource '%s'.", path);
+        LE_ERROR("Attempt to set default value of non-existent resource '%s'.", path);
+        ret = LE_NOT_FOUND;
     }
     else if (resTree_GetDataType(resRef) != IO_DATA_TYPE_STRING)
     {
-        LE_KILL_CLIENT("Attempt to set default value to wrong type for resource '%s'.", path);
+        LE_ERROR("Attempt to set default value to wrong type for resource '%s'.", path);
+        ret = LE_BAD_PARAMETER;
     }
     else if (!resTree_HasDefault(resRef))
     {
         // Create a Data Sample object for this new sample.
         dataSample_Ref_t sampleRef = dataSample_CreateString(0.0, value);
 
-        resTree_SetDefault(resRef, IO_DATA_TYPE_STRING, sampleRef);
+        if (sampleRef)
+        {
+            ret = resTree_SetDefault(resRef, IO_DATA_TYPE_STRING, sampleRef);
+        }
+        else
+        {
+            LE_ERROR("Failed to set default string to path '%s'", path);
+            ret = LE_NO_MEMORY;
+        }
     }
+    else
+    {
+        ret = LE_DUPLICATE;
+    }
+    return ret;
 }
 
 
@@ -935,10 +1129,17 @@ void io_SetStringDefault
 /**
  * Set a JSON type value as the default value of a given resource.
  *
- * @note This will be ignored if the resource already has a default value.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NOT_FOUND If path does not exist.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch or JSON is
+ *          invalid.
+ *      - LE_DUPLICATE If resource already has a default value.
+ *      - LE_FAULT For any other error.
  */
 //--------------------------------------------------------------------------------------------------
-void io_SetJsonDefault
+le_result_t io_SetJsonDefault
 (
     const char* path,
         ///< [IN] Resource path within the client app's namespace.
@@ -948,13 +1149,16 @@ void io_SetJsonDefault
 //--------------------------------------------------------------------------------------------------
 {
     resTree_EntryRef_t resRef = FindResource(path);
+    le_result_t ret;
     if (resRef == NULL)
     {
-        LE_KILL_CLIENT("Attempt to set default value of non-existent resource '%s'.", path);
+        LE_ERROR("Attempt to set default value of non-existent resource '%s'.", path);
+        ret = LE_NOT_FOUND;
     }
     else if (resTree_GetDataType(resRef) != IO_DATA_TYPE_JSON)
     {
-        LE_KILL_CLIENT("Attempt to set default value to wrong type for resource '%s'.", path);
+        LE_ERROR("Attempt to set default value to wrong type for resource '%s'.", path);
+        ret = LE_BAD_PARAMETER;
     }
     else if (!resTree_HasDefault(resRef))
     {
@@ -963,15 +1167,27 @@ void io_SetJsonDefault
             // Create a Data Sample object for this new sample.
             dataSample_Ref_t sampleRef = dataSample_CreateJson(0.0, value);
 
-            resTree_SetDefault(resRef, IO_DATA_TYPE_JSON, sampleRef);
+            if (sampleRef)
+            {
+                ret = resTree_SetDefault(resRef, IO_DATA_TYPE_JSON, sampleRef);
+            }
+            else
+            {
+                LE_ERROR("Failed to set default JSON to path '%s'", path);
+                ret = LE_NO_MEMORY;
+            }
         }
         else
         {
-            LE_KILL_CLIENT("Invalid JSON string as default value for resource '%s' (%s).",
-                           path,
-                           value);
+            LE_ERROR("Invalid JSON string as default value for resource '%s' (%s).", path, value);
+            ret = LE_BAD_PARAMETER;
         }
     }
+    else
+    {
+        ret = LE_DUPLICATE;
+    }
+    return ret;
 }
 
 
@@ -993,7 +1209,7 @@ static dataSample_Ref_t GetCurrentValue
 {
     if (resTree_GetDataType(resRef) != dataType)
     {
-        LE_KILL_CLIENT("Fetch of wrong data type on resource.");
+        LE_ERROR("Fetch of wrong data type on resource.");
         return NULL;
     }
 

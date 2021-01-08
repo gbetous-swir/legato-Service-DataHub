@@ -46,7 +46,7 @@ void dataSample_Init
 /**
  * Creates a new Trigger type Data Sample.
  *
- * @return Ptr to the new object (with reference count 1).
+ * @return Ptr to the new object (with reference count 1) or NULL if failed to allocate memory.
  *
  * @note These are reference-counted memory pool objects.
  */
@@ -61,7 +61,7 @@ dataSample_Ref_t dataSample_CreateTrigger
 /**
  * Creates a new Boolean type Data Sample.
  *
- * @return Ptr to the new object.
+ * @return Ptr to the new object or NULL if failed to allocate memory.
  *
  * @note These are reference-counted memory pool objects.
  */
@@ -77,7 +77,7 @@ dataSample_Ref_t dataSample_CreateBoolean
 /**
  * Creates a new Numeric type Data Sample.
  *
- * @return Ptr to the new object.
+ * @return Ptr to the new object or NULL if failed to allocate memory.
  *
  * @note These are reference-counted memory pool objects.
  */
@@ -93,7 +93,7 @@ dataSample_Ref_t dataSample_CreateNumeric
 /**
  * Creates a new String type Data Sample.
  *
- * @return Ptr to the new object.
+ * @return Ptr to the new object or NULL if failed to allocate memory.
  *
  * @note Copies the string value into the Data Sample.
  *
@@ -111,7 +111,7 @@ dataSample_Ref_t dataSample_CreateString
 /**
  * Creates a new JSON type Data Sample.
  *
- * @return Ptr to the new object.
+ * @return Ptr to the new object or NULL if failed to allocate memory.
  *
  * @note Copies the JSON value into the Data Sample.
  *
@@ -256,7 +256,7 @@ dataSample_Ref_t dataSample_ExtractJson
 /**
  * Create a copy of a Data Sample.
  *
- * @return Pointer to the new copy.
+ * @return Pointer to the new copy or NULL if failed to allocate memory for the copy.
  */
 //--------------------------------------------------------------------------------------------------
 dataSample_Ref_t dataSample_Copy

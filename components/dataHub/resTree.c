@@ -52,7 +52,7 @@ LE_MEM_DEFINE_STATIC_POOL(EntryPool, DEFAULT_RESOURCE_TREE_ENTRY_POOL_SIZE, size
 /**
  * Create an entry object (defaults to a Namespace type entry) as a child of another entry.
  *
- * @return A pointer to the new child object.
+ * @return A pointer to the new child object or NULL if failed to create a child node.
  */
 //--------------------------------------------------------------------------------------------------
 static Entry_t* AddChild
@@ -66,29 +66,31 @@ static Entry_t* AddChild
 {
     if (entryPtr == NULL)
     {
-        entryPtr = le_mem_Alloc(EntryPool);
+        entryPtr = hub_MemAlloc(EntryPool);
 
-        if (LE_OK != le_utf8_Copy(entryPtr->name, name, sizeof(entryPtr->name), NULL))
+        if (entryPtr)
         {
-            LE_ERROR("Resource tree entry name longer than %zu bytes max. Truncated to '%s'.",
-                     sizeof(entryPtr->name),
-                     name);
+            LE_ASSERT_OK(le_utf8_Copy(entryPtr->name, name, sizeof(entryPtr->name), NULL));
+
+            entryPtr->link = LE_DLS_LINK_INIT;
+            entryPtr->childList = LE_DLS_LIST_INIT;
+            entryPtr->type = ADMIN_ENTRY_TYPE_NAMESPACE;
+
+            if (parentPtr != NULL)
+            {
+                LE_ASSERT(resTree_FindChildEx(parentPtr, name, true) == NULL);
+
+                // Increment the reference count on the parent.
+                le_mem_AddRef(parentPtr);
+
+                // Link to the parent entry.
+                entryPtr->parentPtr = parentPtr;
+                le_dls_Queue(&parentPtr->childList, &entryPtr->link);
+            }
         }
-
-        entryPtr->link = LE_DLS_LINK_INIT;
-        entryPtr->childList = LE_DLS_LIST_INIT;
-        entryPtr->type = ADMIN_ENTRY_TYPE_NAMESPACE;
-
-        if (parentPtr != NULL)
+        else
         {
-            LE_ASSERT(resTree_FindChildEx(parentPtr, name, true) == NULL);
-
-            // Increment the reference count on the parent.
-            le_mem_AddRef(parentPtr);
-
-            // Link to the parent entry.
-            entryPtr->parentPtr = parentPtr;
-            le_dls_Queue(&parentPtr->childList, &entryPtr->link);
+            LE_ERROR("Failed to allocate memory in AddChild");
         }
     }
     else
@@ -98,7 +100,10 @@ static Entry_t* AddChild
         LE_ASSERT(le_dls_IsEmpty(&entryPtr->childList));
     }
 
-    entryPtr->u.flags = RES_FLAG_NEW;
+    if (entryPtr)
+    {
+        entryPtr->u.flags = RES_FLAG_NEW;
+    }
     return entryPtr;
 }
 
@@ -147,6 +152,7 @@ void resTree_Init
 
     // Create the Root Namespace.
     RootPtr = AddChild(NULL, "", NULL);
+    LE_ASSERT(RootPtr);
 }
 
 
@@ -248,29 +254,17 @@ resTree_EntryRef_t resTree_FindChild
 /**
  * Go to the entry at a given resource path.
  *
- * Optionally will create a missing entry if doCreate is true.  If doCreate is false, won't
- * create any entries at all and will just return NULL if the entry doesn't exist.
+ * Assumes path is valid.
  *
- * @return Reference to the object, or
- *         NULL if path malformed or if doCreate == false and entry doesn't exist.
+ * @return Reference to the object, or NULL if entry doesn't exist.
  */
 //--------------------------------------------------------------------------------------------------
-static resTree_EntryRef_t GoToEntry
+static resTree_EntryRef_t FindEntry
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
-    const char* path,   ///< Path.
-    bool doCreate       ///< true = create if missing, false = return NULL if missing.
+    const char* path   ///< Path.
 )
-//--------------------------------------------------------------------------------------------------
 {
-    // Validate the path.
-    const char* illegalCharPtr = strpbrk(path, ".[]");
-    if (illegalCharPtr != NULL)
-    {
-        LE_ERROR("Illegal character '%c' in path '%s'.", *illegalCharPtr, path);
-        return NULL;
-    }
-
     resTree_EntryRef_t currentEntry = baseNamespace;
 
     size_t i = 0;   // Index into path.
@@ -290,18 +284,8 @@ static resTree_EntryRef_t GoToEntry
 
         // Compute the length of the entry name in this path element.
         size_t nameLen = terminatorPtr - (path + i);
-
-        // Sanity check the length.
-        if (nameLen == 0)
-        {
-            LE_ERROR("Resource path element missing in path '%s'.", path);
-            return NULL;
-        }
-        if (nameLen >= sizeof(entryName))
-        {
-            LE_ERROR("Resource path element too long in path '%s'.", path);
-            return NULL;
-        }
+        LE_ASSERT(nameLen != 0);
+        LE_ASSERT(nameLen < sizeof(entryName));
 
         // Copy the name out and null terminate it.
         (void)strncpy(entryName, path + i, nameLen);
@@ -313,16 +297,7 @@ static resTree_EntryRef_t GoToEntry
 
         if (childPtr == NULL || resTree_IsDeleted(childPtr))
         {
-            // If we're supposed to create a missing entry, create one now.
-            // Otherwise, return NULL.
-            if (doCreate)
-            {
-                childPtr = AddChild(currentEntry, entryName, childPtr);
-            }
-            else
-            {
-                return NULL;
-            }
+            return NULL;
         }
 
         // The child is now the base for the rest of the path.
@@ -335,6 +310,92 @@ static resTree_EntryRef_t GoToEntry
     return currentEntry;
 }
 
+//--------------------------------------------------------------------------------------------------
+/**
+ * Create a new entry at a given resource path.
+ *
+ * Will create a missing entry. Should only be called when entry does not exist.
+ *
+ * Assumes path is valid and entry does not exist.
+ *
+ * @return Reference to the object, or NULL if creating a new entry fails.
+ */
+//--------------------------------------------------------------------------------------------------
+static resTree_EntryRef_t CreateEntry
+(
+    resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
+    const char* path   ///< Path.
+)
+{
+    resTree_EntryRef_t currentEntry = baseNamespace;
+    resTree_EntryRef_t firstNewEntry = NULL;
+    size_t i = 0;   // Index into path.
+
+    while (path[i] != '\0')
+    {
+        char entryName[HUB_MAX_ENTRY_NAME_BYTES];
+
+        // If we're at a slash, skip it.
+        if (path[i] == '/')
+        {
+            i++;
+        }
+
+        // Look for a slash or the end of the string as the terminator of the next entry name.
+        const char* terminatorPtr = strchrnul(path + i, '/');
+
+        // Compute the length of the entry name in this path element.
+        size_t nameLen = terminatorPtr - (path + i);
+        LE_ASSERT(nameLen != 0);
+        LE_ASSERT(nameLen < sizeof(entryName));
+
+        // Copy the name out and null terminate it.
+        (void)strncpy(entryName, path + i, nameLen);
+        entryName[nameLen] = '\0';
+
+        // Look up the entry name in the list of children of the current entry.
+        // If found, this becomes the new current entry.
+        Entry_t* childPtr = resTree_FindChildEx(currentEntry, entryName, true);
+
+        LE_FATAL_IF(((childPtr != NULL) && (*terminatorPtr == '\0')), "Attempting to create an"
+                    "entry that already exists");
+
+        if (childPtr == NULL || resTree_IsDeleted(childPtr))
+        {
+            // create a missing entry.
+            childPtr = AddChild(currentEntry, entryName, childPtr);
+            if (childPtr == NULL)
+            {
+                LE_ERROR("Failed to add child, path: %s", path);
+                goto cleanup;
+            }
+            else if (firstNewEntry == NULL)
+            {
+                firstNewEntry = childPtr;
+            }
+        }
+
+        // The child is now the base for the rest of the path.
+        currentEntry = childPtr;
+
+        // Advance the index past the name.
+        i += nameLen;
+    }
+    return currentEntry;
+
+cleanup:
+    if (firstNewEntry)
+    {
+        // Have to delete from currentEntry to firstNewEntry
+        resTree_EntryRef_t tmp;
+        do{
+            tmp = currentEntry;
+            currentEntry = currentEntry->parentPtr;
+            le_mem_Release(tmp);
+        } while(tmp != firstNewEntry);
+    }
+    return NULL;
+}
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -371,6 +432,29 @@ static void ReplaceResource
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Replace an entry with a placeholder
+ */
+//--------------------------------------------------------------------------------------------------
+void ReplaceWithPlaceholder
+(
+    resTree_EntryRef_t entryRef ///< reference to entry being replaced
+)
+//--------------------------------------------------------------------------------------------------
+{
+    res_Resource_t* placeholderPtr = res_CreatePlaceholder(entryRef);
+    if (placeholderPtr)
+    {
+        ReplaceResource(entryRef, placeholderPtr, ADMIN_ENTRY_TYPE_PLACEHOLDER);
+    }
+    else
+    {
+        // unable to allocate a placeholder resource, reuse the entry itself as placeholder:
+        entryRef->type = ADMIN_ENTRY_TYPE_PLACEHOLDER;
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Notify handlers that a Resource has been added or removed from the tree
  */
 //--------------------------------------------------------------------------------------------------
@@ -402,7 +486,12 @@ resTree_EntryRef_t resTree_FindEntry
 )
 //--------------------------------------------------------------------------------------------------
 {
-    return GoToEntry(baseNamespace, path, /* doCreate = */ false);
+    resTree_EntryRef_t entryRef = NULL;
+    if (!hub_IsResourcePathMalformed(path))
+    {
+        entryRef = FindEntry(baseNamespace, path);
+    }
+    return entryRef;
 }
 
 
@@ -512,17 +601,40 @@ io_DataType_t resTree_GetDataType
  * Creates a Namespace if nothing exists at that path.
  * Also creates parent, grandparent, etc. Namespaces, as needed.
  *
- * @return Reference to the object, or NULL if the path is malformed.
+ * @return
+ *      - LE_OK If getting entry was successful and entryRefPtr points to entry reference.
+ *      - LE_NO_MEMORY If there was a failure in memory allocation.
+ *      - LE_BAD_PARAMETER If path is malformed.
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetEntry
+le_result_t resTree_GetEntry
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
-    const char* path    ///< Path.
+    const char* path,                 ///< Path.
+    resTree_EntryRef_t* entryRefPtr   ///<[OUT] Pointer to write reference to object to.
 )
 //--------------------------------------------------------------------------------------------------
 {
-    return GoToEntry(baseNamespace, path, /* doCreate = */ true);
+    le_result_t ret = LE_OK;
+    resTree_EntryRef_t entryRef = NULL;
+    if (hub_IsResourcePathMalformed(path))
+    {
+        ret = LE_BAD_PARAMETER;
+    }
+    else
+    {
+        entryRef = FindEntry(baseNamespace, path);
+        if (entryRef == NULL)
+        {
+            entryRef = CreateEntry(baseNamespace, path);
+            if (entryRef == NULL)
+            {
+                ret = LE_NO_MEMORY;
+            }
+        }
+    }
+    *entryRefPtr = entryRef;
+    return ret;
 }
 
 
@@ -532,35 +644,61 @@ resTree_EntryRef_t resTree_GetEntry
  * Creates a Placeholder resource if nothing exists at that path.
  * Also creates parent, grandparent, etc. Namespaces, as needed.
  *
- * If there's already a Namespace at the given path, it will be deleted and replaced by a
+ * If there's already a Namespace at the given path, it will be replaced by a
  * Placeholder.
  *
- * @return Reference to the object, or NULL if the path is malformed.
+ * @return
+ *      - LE_OK If getting resource was successful. entryRefPtr points to entry reference.
+ *      - LE_BAD_PARAMETER If path is malformed.
+ *      - LE_NO_MEMORY There was a failure to allocate memory.
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetResource
+le_result_t resTree_GetResource
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
-    const char* path    ///< Path.
+    const char* path,                 ///< Path.
+    resTree_EntryRef_t* entryRefPtr   ///<[OUT] Pointer to write reference to object to.
 )
 //--------------------------------------------------------------------------------------------------
 {
-    resTree_EntryRef_t entryRef = GoToEntry(baseNamespace, path, /* doCreate = */ true);
+    resTree_EntryRef_t entryRef;
+    le_result_t ret = LE_OK;
 
-    if (entryRef == NULL)
+    if (hub_IsResourcePathMalformed(path))
     {
-        return NULL;
+        ret = LE_BAD_PARAMETER;
     }
-
-    // If a Namespace currently resides at that spot in the tree, replace it with a Placeholder.
-    if (entryRef->type == ADMIN_ENTRY_TYPE_NAMESPACE)
+    else
     {
-        res_Resource_t* placeholderPtr = res_CreatePlaceholder(entryRef);
+        entryRef = FindEntry(baseNamespace, path);
+        if (entryRef == NULL)
+        {
+            entryRef = CreateEntry(baseNamespace, path);
+        }
 
-        ReplaceResource(entryRef, placeholderPtr, ADMIN_ENTRY_TYPE_PLACEHOLDER);
+        if (entryRef == NULL)
+        {
+            ret = LE_NO_MEMORY;
+        }
+        else
+        {
+            // If a Namespace currently resides at that spot in the tree,
+            // replace it with a Placeholder.
+            if (entryRef->type == ADMIN_ENTRY_TYPE_NAMESPACE)
+            {
+                ReplaceWithPlaceholder(entryRef);
+            }
+        }
     }
-
-    return entryRef;
+    if (ret == LE_OK)
+    {
+        *entryRefPtr = entryRef;
+    }
+    else
+    {
+        *entryRefPtr = NULL;
+    }
+    return ret;
 }
 
 
@@ -573,64 +711,101 @@ resTree_EntryRef_t resTree_GetResource
  * If there's already a Namespace or Placeholder at the given path, it will be deleted and
  * replaced by an Input.
  *
- * @return Reference to the object, or NULL if the path is malformed, an Output or Observation
+ * @return
+ *      - LE_OK If successful.
+ *      - LE_NO_MEMORY If getting input required creating a new input but there was no memory to
+ *          allocate the input.
+ *      - LE_BAD_PARAMETER If path is malformed, an Output or Observation
  *         already exists at that location, or an Input with different units or data type already
- *         exists at that location.
+ *         exists at that location
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetInput
+le_result_t resTree_GetInput
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path,       ///< Path.
     io_DataType_t dataType, ///< The data type.
-    const char* units       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
+    const char* units,       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
+    resTree_EntryRef_t* entryRefPtr ///<[OUT] Pointer to write reference to object to.
 )
 //--------------------------------------------------------------------------------------------------
 {
-    resTree_EntryRef_t entryRef = GoToEntry(baseNamespace, path, /* doCreate = */ true);
+    bool createdEntry = false;
+    resTree_EntryRef_t entryRef = NULL;
+    le_result_t ret = LE_OK;
 
+    if (hub_IsResourcePathMalformed(path))
+    {
+        return LE_BAD_PARAMETER;
+    }
+
+    entryRef = FindEntry(baseNamespace, path);
     if (entryRef == NULL)
     {
-        return NULL;
+        entryRef = CreateEntry(baseNamespace, path);
+        if (entryRef)
+        {
+            createdEntry = true;
+        }
+        else
+        {
+            return LE_NO_MEMORY;
+        }
     }
 
     switch (entryRef->type)
     {
-        // If a Namespace or Placeholder currently resides at that spot in the tree, replace it with
-        // an Input.
+        // If a Namespace or Placeholder currently resides at that spot in the tree,
+        // replace it with an Input.
         // NOTE: If a new entry was created for this, it will be a Namespace entry.
         case ADMIN_ENTRY_TYPE_NAMESPACE:
         case ADMIN_ENTRY_TYPE_PLACEHOLDER:
         {
             res_Resource_t* resPtr = res_CreateInput(entryRef, dataType, units);
-            ReplaceResource(entryRef, resPtr, ADMIN_ENTRY_TYPE_INPUT);
+            if (resPtr)
+            {
+                ReplaceResource(entryRef, resPtr, ADMIN_ENTRY_TYPE_INPUT);
 
-            CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_INPUT, ADMIN_RESOURCE_ADDED);
+                CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_INPUT,
+                                               ADMIN_RESOURCE_ADDED);
 
-            return entryRef;
+                *entryRefPtr = entryRef;
+            }
+            else
+            {
+                ret = LE_NO_MEMORY;
+            }
+            break;
         }
         case ADMIN_ENTRY_TYPE_INPUT:
-
             LE_ERROR("Attempt to replace an Input with another Input.");
-            return NULL;
+            ret = LE_BAD_PARAMETER;
+            break;
 
         case ADMIN_ENTRY_TYPE_OUTPUT:
-
             LE_ERROR("Attempt to replace an Output with an Input.");
-            return NULL;
+            ret = LE_BAD_PARAMETER;
+            break;
 
         case ADMIN_ENTRY_TYPE_OBSERVATION:
-
             LE_ERROR("Attempt to replace an Observation with an Input.");
-            return NULL;
+            ret = LE_BAD_PARAMETER;
+            break;
 
         case ADMIN_ENTRY_TYPE_NONE:
-
             // This should never happen.
+            LE_FATAL("Unexpected entry type %d", entryRef->type);
             break;
     }
 
-    LE_FATAL("Unexpected entry type %d", entryRef->type);
+    if (ret != LE_OK)
+    {
+        if (createdEntry)
+        {
+            le_mem_Release(entryRef);
+        }
+    }
+    return ret;
 }
 
 
@@ -643,63 +818,110 @@ resTree_EntryRef_t resTree_GetInput
  * If there's already a Namespace or Placeholder at the given path, it will be deleted and
  * replaced by an Output.
  *
- * @return Reference to the object, or NULL if the path is malformed, an Input or Observation
  *         already exists at that location, or an Output with different units or data type already
  *         exists at that location.
+ * @return
+ *      - LE_OK If successful.
+ *      - LE_NO_MEMORY If getting input required creating a new input but there was no memory to
+ *          allocate the input.
+ *      - LE_BAD_PARAMETER If path is malformed, an Output or Observation
+ *         already exists at that location, or an Input with different units or data type already
+ *         exists at that location
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetOutput
+le_result_t resTree_GetOutput
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path,       ///< Path.
     io_DataType_t dataType, ///< The data type.
-    const char* units       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
+    const char* units,      ///< Units string, e.g., "degC" (see senml); "" = unspecified.
+    resTree_EntryRef_t* entryRefPtr ///<[OUT] Pointer to write reference to object to.
 )
 //--------------------------------------------------------------------------------------------------
 {
-    resTree_EntryRef_t entryRef = GoToEntry(baseNamespace, path, /* doCreate = */ true);
+    bool createdEntry = false;
+    resTree_EntryRef_t entryRef = NULL;
+    le_result_t ret = LE_OK;
 
-    if (entryRef == NULL)
+    if (hub_IsResourcePathMalformed(path))
     {
-        return NULL;
+        ret = LE_BAD_PARAMETER;
     }
-
-    switch (entryRef->type)
+    else
     {
-        // If a Namespace or Placeholder currently resides at that spot in the tree, replace it with
-        // an Output.
-        case ADMIN_ENTRY_TYPE_NAMESPACE:
-        case ADMIN_ENTRY_TYPE_PLACEHOLDER:
+        entryRef = FindEntry(baseNamespace, path);
+        if (entryRef)
         {
-            res_Resource_t* resPtr = res_CreateOutput(entryRef, dataType, units);
-            ReplaceResource(entryRef, resPtr, ADMIN_ENTRY_TYPE_OUTPUT);
-
-            CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_OUTPUT, ADMIN_RESOURCE_ADDED);
-
-            return entryRef;
+            createdEntry = false;
         }
-        case ADMIN_ENTRY_TYPE_INPUT:
+        else
+        {
+            entryRef = CreateEntry(baseNamespace, path);
+            if (entryRef)
+            {
+                createdEntry = true;
+            }
+        }
 
-            LE_ERROR("Attempt to replace an Input with an Output.");
-            return NULL;
+        if (entryRef == NULL)
+        {
+            ret = LE_NO_MEMORY;
+        }
+        else
+        {
+            switch (entryRef->type)
+            {
+                // If a Namespace or Placeholder currently resides at that spot in the tree,
+                // replace it with an Output.
+                case ADMIN_ENTRY_TYPE_NAMESPACE:
+                case ADMIN_ENTRY_TYPE_PLACEHOLDER:
+                {
 
-        case ADMIN_ENTRY_TYPE_OUTPUT:
+                    res_Resource_t* resPtr = res_CreateOutput(entryRef, dataType, units);
+                    if (resPtr)
+                    {
+                        ReplaceResource(entryRef, resPtr, ADMIN_ENTRY_TYPE_OUTPUT);
 
-            LE_ERROR("Attempt to replace an Output with another Output.");
-            return NULL;
+                        CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_OUTPUT,
+                                                       ADMIN_RESOURCE_ADDED);
+                        *entryRefPtr = entryRef;
+                    }
+                    else
+                    {
+                        ret = LE_NO_MEMORY;
+                    }
+                    break;
+                }
+                case ADMIN_ENTRY_TYPE_INPUT:
+                    LE_ERROR("Attempt to replace an Input with an Output.");
+                    ret = LE_BAD_PARAMETER;
+                    break;
 
-        case ADMIN_ENTRY_TYPE_OBSERVATION:
+                case ADMIN_ENTRY_TYPE_OUTPUT:
+                    LE_ERROR("Attempt to replace an Output with another Output.");
+                    ret = LE_BAD_PARAMETER;
+                    break;
 
-            LE_ERROR("Attempt to replace an Observation with an Output.");
-            return NULL;
+                case ADMIN_ENTRY_TYPE_OBSERVATION:
+                    LE_ERROR("Attempt to replace an Observation with an Output.");
+                    ret = LE_BAD_PARAMETER;
+                    break;
 
-        case ADMIN_ENTRY_TYPE_NONE:
-
-            // This should never happen.
-            break;
+                case ADMIN_ENTRY_TYPE_NONE:
+                    // This should never happen.
+                    LE_FATAL("Unexpected entry type %d", entryRef->type);
+                    break;
+            }
+        }
     }
-
-    LE_FATAL("Unexpected entry type %d", entryRef->type);
+    if (ret != LE_OK)
+    {
+        if (createdEntry)
+        {
+            le_mem_Release(entryRef);
+        }
+    }
+    return ret;
 }
 
 
@@ -712,61 +934,102 @@ resTree_EntryRef_t resTree_GetOutput
  * If there's already a Namespace or Placeholder at the given path, it will be deleted and
  * replaced by an Observation.
  *
- * @return Reference to the object, or NULL if the path is malformed or an Input or Output already
- *         exists at that location.
+ * @return
+ *      - LE_OK If getting observation was successful. entryRefPtr points to entry reference.
+ *      - LE_BAD_PARAMETER If the path is malformed or an Input or Output already exists at that
+ *        location.
+ *      - LE_NO_MEMORY If there was a failure to allocate memory.
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetObservation
+le_result_t resTree_GetObservation
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
-    const char* path    ///< Path.
+    const char* path,                 ///< Path.
+    resTree_EntryRef_t* entryRefPtr   ///<[OUT] Pointer to write reference to object to.
 )
 //--------------------------------------------------------------------------------------------------
 {
-    resTree_EntryRef_t entryRef = GoToEntry(baseNamespace, path, /* doCreate = */ true);
-
-    if (entryRef == NULL)
+    bool createdEntry = false;
+    le_result_t ret = LE_OK;
+    resTree_EntryRef_t entryRef;
+    if (hub_IsResourcePathMalformed(path))
     {
-        return NULL;
+        ret = LE_BAD_PARAMETER;
     }
-
-    // If a Namespace or Placeholder currently resides at that spot in the tree, replace it with
-    // an Observation.
-    switch (entryRef->type)
+    else
     {
-        case ADMIN_ENTRY_TYPE_NAMESPACE:
-        case ADMIN_ENTRY_TYPE_PLACEHOLDER:
+        entryRef = FindEntry(baseNamespace, path);
+        if (entryRef)
         {
-            res_Resource_t* obsPtr = res_CreateObservation(entryRef);
-            ReplaceResource(entryRef, obsPtr, ADMIN_ENTRY_TYPE_OBSERVATION);
-            res_RestoreBackup(obsPtr);
-
-            CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_OBSERVATION, ADMIN_RESOURCE_ADDED);
-
-            return entryRef;
+            createdEntry = false;
         }
-        case ADMIN_ENTRY_TYPE_INPUT:
+        else
+        {
+            entryRef = CreateEntry(baseNamespace, path);
+            if (entryRef)
+            {
+                createdEntry = true;
+            }
+        }
 
-            LE_ERROR("Attempt to replace an Input with an Observation.");
-            return NULL;
+        if (entryRef == NULL)
+        {
+            ret = LE_NO_MEMORY;
+        }
+        else
+        {
+            // If a Namespace or Placeholder currently resides at that spot in the tree, replace it with
+            // an Observation.
+            switch (entryRef->type)
+            {
+                case ADMIN_ENTRY_TYPE_NAMESPACE:
+                case ADMIN_ENTRY_TYPE_PLACEHOLDER:
+                {
+                    res_Resource_t* obsPtr = res_CreateObservation(entryRef);
+                    if (obsPtr)
+                    {
+                        ReplaceResource(entryRef, obsPtr, ADMIN_ENTRY_TYPE_OBSERVATION);
+                        res_RestoreBackup(obsPtr);
 
-        case ADMIN_ENTRY_TYPE_OUTPUT:
+                        CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_OBSERVATION,
+                                                       ADMIN_RESOURCE_ADDED);
+                        *entryRefPtr = entryRef;
+                    }
+                    else
+                    {
+                        ret = LE_NO_MEMORY;
+                    }
+                    break;
+                }
+                case ADMIN_ENTRY_TYPE_INPUT:
+                    LE_ERROR("Attempt to replace an Input with an Observation.");
+                    ret = LE_BAD_PARAMETER;
+                    break;
 
-            LE_ERROR("Attempt to replace an Output with an Observation.");
-            return NULL;
+                case ADMIN_ENTRY_TYPE_OUTPUT:
+                    LE_ERROR("Attempt to replace an Output with an Observation.");
+                    ret = LE_BAD_PARAMETER;
+                    break;
 
-        case ADMIN_ENTRY_TYPE_OBSERVATION:
+                case ADMIN_ENTRY_TYPE_OBSERVATION:
+                    *entryRefPtr = entryRef;
+                    break;
 
-            // Nothing needs to be done here.
-            return entryRef;
-
-        case ADMIN_ENTRY_TYPE_NONE:
-
-            // This should never happen.
-            break;
+                case ADMIN_ENTRY_TYPE_NONE:
+                    // This should never happen.
+                    LE_FATAL("Unexpected entry type %d", entryRef->type);
+                    break;
+            }
+        }
     }
-
-    LE_FATAL("Unexpected entry type %d", entryRef->type);
+    if (ret != LE_OK)
+    {
+        if (createdEntry)
+        {
+            le_mem_Release(entryRef);
+        }
+    }
+    return ret;
 }
 
 
@@ -974,9 +1237,16 @@ resTree_EntryRef_t resTree_GetNextSibling
  * Push a data sample to a resource.
  *
  * @note Takes ownership of the data sample reference.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_FAULT is any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-void resTree_Push
+le_result_t resTree_Push
 (
     resTree_EntryRef_t entryRef,    ///< The entry to push to.
     io_DataType_t dataType,         ///< The data type.
@@ -991,18 +1261,18 @@ void resTree_Push
         case ADMIN_ENTRY_TYPE_OBSERVATION:
         case ADMIN_ENTRY_TYPE_PLACEHOLDER:
 
-            res_Push(entryRef->u.resourcePtr, dataType, NULL, dataSample);
-            break;
+            return res_Push(entryRef->u.resourcePtr, dataType, NULL, dataSample);
 
         case ADMIN_ENTRY_TYPE_NAMESPACE:
 
             // Throw away the data sample.
             le_mem_Release(dataSample);
-            break;
+            return LE_BAD_PARAMETER;
 
         case ADMIN_ENTRY_TYPE_NONE:
             LE_FATAL("Unexpected entry type.");
     }
+    return LE_FAULT;
 }
 
 
@@ -1010,7 +1280,7 @@ void resTree_Push
 /**
  * Add a Push Handler to an Output resource.
  *
- * @return Reference to the handler added.
+ * @return Reference to the handler added. NULL if failed to add handler.
  *
  * @note Can be removed by calling handler_Remove().
  */
@@ -1024,10 +1294,15 @@ hub_HandlerRef_t resTree_AddPushHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    return res_AddPushHandler(resRef->u.resourcePtr,
+    hub_HandlerRef_t h = res_AddPushHandler(resRef->u.resourcePtr,
                               dataType,
                               callbackPtr,
                               contextPtr);
+    if (h == NULL)
+    {
+        LE_CRIT("Adding handler failed!");
+    }
+    return h;
 }
 
 
@@ -1127,8 +1402,7 @@ void resTree_DeleteIO
     {
         // There are still administrative settings present on this resource, so replace it
         // with a Placeholder.
-        res_Resource_t* placeholderPtr = res_CreatePlaceholder(entryRef);
-        ReplaceResource(entryRef, placeholderPtr, ADMIN_ENTRY_TYPE_PLACEHOLDER);
+        ReplaceWithPlaceholder(entryRef);
     }
     else
     {
@@ -1474,11 +1748,14 @@ bool resTree_IsMandatory
 /**
  * Set the default value of a resource.
  *
- * @note Default will be discarded by an Input or Output resource if the default's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-void resTree_SetDefault
+le_result_t resTree_SetDefault
 (
     resTree_EntryRef_t resEntry,
     io_DataType_t dataType,
@@ -1486,7 +1763,7 @@ void resTree_SetDefault
 )
 //--------------------------------------------------------------------------------------------------
 {
-    res_SetDefault(resEntry->u.resourcePtr, dataType, value);
+    return res_SetDefault(resEntry->u.resourcePtr, dataType, value);
 }
 
 
@@ -1560,11 +1837,14 @@ void resTree_RemoveDefault
 /**
  * Set an override on a given resource.
  *
- * @note Override will be discarded by an Input or Output resource if the override's data type
- *       does not match the data type of the Input or Output.
+ * @return
+ *      - LE_OK If setting override was successful.
+ *      - LE_NO_MEMORY If could not set override value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
+ *      - LE_FAULT If any other error happened.
  */
 //--------------------------------------------------------------------------------------------------
-void resTree_SetOverride
+le_result_t resTree_SetOverride
 (
     resTree_EntryRef_t resEntry,
     io_DataType_t dataType,
@@ -1572,7 +1852,7 @@ void resTree_SetOverride
 )
 //--------------------------------------------------------------------------------------------------
 {
-    res_SetOverride(resEntry->u.resourcePtr, dataType, value);
+    return res_SetOverride(resEntry->u.resourcePtr, dataType, value);
 }
 
 

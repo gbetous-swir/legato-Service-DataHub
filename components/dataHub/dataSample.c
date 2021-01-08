@@ -89,7 +89,11 @@ static void StringSampleDestructor
 )
 {
     dataSample_Ref_t samplePtr = objPtr;
-    le_mem_Release((char*) dataSample_GetString(samplePtr));
+    const char* strValue = dataSample_GetString(samplePtr);
+    if (strValue)
+    {
+        le_mem_Release((char*)strValue);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -128,7 +132,7 @@ void dataSample_Init
  *
  * @warning Don't forget to set the value if it's not a trigger type.
  *
- * @return Ptr to the new object.
+ * @return Ptr to the new object or NULL if failed to allocate memory.
  */
 //--------------------------------------------------------------------------------------------------
 static inline DataSample_t* CreateSample
@@ -138,7 +142,13 @@ static inline DataSample_t* CreateSample
 )
 //--------------------------------------------------------------------------------------------------
 {
-    DataSample_t* samplePtr = le_mem_Alloc(pool);
+    DataSample_t* samplePtr = hub_MemAlloc(pool);
+
+    if (samplePtr == NULL)
+    {
+        LE_ERROR("Failed to allocate space for a datasample");
+        return NULL;
+    }
 
     if (timestamp == IO_NOW)
     {
@@ -156,7 +166,7 @@ static inline DataSample_t* CreateSample
 /**
  * Creates a new Trigger type Data Sample.
  *
- * @return Ptr to the new object (with reference count 1).
+ * @return Ptr to the new object (with reference count 1) or NULL if failed to allocate memory.
  *
  * @note These are reference-counted memory pool objects.
  */
@@ -177,7 +187,7 @@ dataSample_Ref_t dataSample_CreateTrigger
 /**
  * Creates a new Boolean type Data Sample.
  *
- * @return Ptr to the new object.
+ * @return Ptr to the new object or NULL if failed to allocate memory.
  *
  * @note These are reference-counted memory pool objects.
  */
@@ -190,7 +200,10 @@ dataSample_Ref_t dataSample_CreateBoolean
 //--------------------------------------------------------------------------------------------------
 {
     DataSample_t* samplePtr = CreateSample(NonStringDataSamplePool, timestamp);
-    samplePtr->value.boolean = value;
+    if (samplePtr)
+    {
+        samplePtr->value.boolean = value;
+    }
 
     return samplePtr;
 }
@@ -200,7 +213,7 @@ dataSample_Ref_t dataSample_CreateBoolean
 /**
  * Creates a new Numeric type Data Sample.
  *
- * @return Ptr to the new object.
+ * @return Ptr to the new object or NULL if failed to allocate memory.
  *
  * @note These are reference-counted memory pool objects.
  */
@@ -213,7 +226,10 @@ dataSample_Ref_t dataSample_CreateNumeric
 //--------------------------------------------------------------------------------------------------
 {
     DataSample_t* samplePtr = CreateSample(NonStringDataSamplePool, timestamp);
-    samplePtr->value.numeric = value;
+    if (samplePtr)
+    {
+        samplePtr->value.numeric = value;
+    }
 
     return samplePtr;
 }
@@ -223,7 +239,7 @@ dataSample_Ref_t dataSample_CreateNumeric
 /**
  * Creates a new String type Data Sample.
  *
- * @return Ptr to the new object.
+ * @return Ptr to the new object or NULL if failed to allocate memory.
  *
  * @note Copies the string value into the Data Sample.
  *
@@ -238,10 +254,16 @@ dataSample_Ref_t dataSample_CreateString
 //--------------------------------------------------------------------------------------------------
 {
     DataSample_t *samplePtr = CreateSample(StringBasedDataSamplePool, timestamp);
-
-    samplePtr->value.stringPtr = le_mem_StrDup(StringPool, value);
-    LE_FATAL_IF(samplePtr->value.stringPtr == NULL,
-        "Could not allocate space for string of size %" PRIuS, le_utf8_NumBytes(value));
+    if (samplePtr)
+    {
+        samplePtr->value.stringPtr = le_mem_StrDup(StringPool, value);
+        if (samplePtr->value.stringPtr == NULL)
+        {
+            LE_ERROR("Could not allocate space for string of size %" PRIuS, le_utf8_NumBytes(value));
+            le_mem_Release(samplePtr);
+            samplePtr = NULL;
+        }
+    }
     return samplePtr;
 }
 
@@ -250,7 +272,7 @@ dataSample_Ref_t dataSample_CreateString
 /**
  * Creates a new JSON type Data Sample.
  *
- * @return Ptr to the new object.
+ * @return Ptr to the new object or NULL if failed to allocate memory.
  *
  * @note Copies the JSON value into the Data Sample.
  *
@@ -562,7 +584,7 @@ dataSample_Ref_t dataSample_ExtractJson
 /**
  * Create a copy of a Data Sample.
  *
- * @return Pointer to the new copy.
+ * @return Pointer to the new copy or NULL if failed to allocate memory for the copy.
  */
 //--------------------------------------------------------------------------------------------------
 dataSample_Ref_t dataSample_Copy
@@ -577,13 +599,24 @@ dataSample_Ref_t dataSample_Copy
     if ((dataType == IO_DATA_TYPE_STRING) || (dataType == IO_DATA_TYPE_JSON))
     {
         duplicate = le_mem_Alloc(StringBasedDataSamplePool);
-        *duplicate = *original;
-        duplicate->value.stringPtr = le_mem_StrDup(StringPool, original->value.stringPtr);
+        if (duplicate)
+        {
+            *duplicate = *original;
+            duplicate->value.stringPtr = le_mem_StrDup(StringPool, original->value.stringPtr);
+            if (!duplicate->value.stringPtr)
+            {
+                le_mem_Release(duplicate);
+                duplicate = NULL;
+            }
+        }
     }
     else
     {
         duplicate = le_mem_Alloc(NonStringDataSamplePool);
-        *duplicate = *original;
+        if (duplicate)
+        {
+            *duplicate = *original;
+        }
     }
 
     return duplicate;

@@ -25,7 +25,7 @@ void ioPoint_Init
 /**
  * Create an Input Resource.
  *
- * @return Pointer to the Resource.
+ * @return Pointer to the Resource or NULL if it failed to create a resource.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* ioPoint_CreateInput
@@ -39,7 +39,7 @@ res_Resource_t* ioPoint_CreateInput
 /**
  * Create an Output Resource.
  *
- * @return Pointer to the Resource.
+ * @return Pointer to the Resource or NULL if it failed to create a resource.
  */
 //--------------------------------------------------------------------------------------------------
 res_Resource_t* ioPoint_CreateOutput
@@ -93,9 +93,13 @@ void ioPoint_RemovePushHandler
 /**
  * Perform type coercion, replacing a data sample with another of a different type, if necessary,
  * to make the data compatible with the data type of a given Input or Output resource.
+ *
+ * @return
+ *      - LE_OK If coercion happened successfully.
+ *      - LE_NO_MEMORY If could not coerce to a new type because failed to allocate a new datasample
  */
 //--------------------------------------------------------------------------------------------------
-void ioPoint_DoTypeCoercion
+le_result_t ioPoint_DoTypeCoercion
 (
     res_Resource_t* resPtr,
     io_DataType_t* dataTypePtr,     ///< [INOUT] the data type, may be changed by type coercion

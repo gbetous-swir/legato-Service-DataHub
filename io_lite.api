@@ -468,9 +468,13 @@ FUNCTION le_result_t CreateOutput
  * Delete a resource.
  *
  * Does nothing if the resource doesn't exist.
+ *
+ * @return
+ *      - LE_OK if resource was deleted successfully.
+ *      - LE_NOT_FOUND if resource was not found.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION DeleteResource
+FUNCTION le_result_t DeleteResource
 (
     string path[MAX_RESOURCE_PATH_LEN] IN ///< Resource path within the client app's namespace.
 );
@@ -479,9 +483,21 @@ FUNCTION DeleteResource
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a trigger type data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushTrigger
+FUNCTION le_result_t PushTrigger
 (
     string path[MAX_RESOURCE_PATH_LEN] IN,///< Resource path within the client app's namespace.
     double timestamp IN ///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -492,9 +508,21 @@ FUNCTION PushTrigger
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a Boolean type data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushBoolean
+FUNCTION le_result_t PushBoolean
 (
     string path[MAX_RESOURCE_PATH_LEN] IN,///< Resource path within the client app's namespace.
     double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -506,9 +534,21 @@ FUNCTION PushBoolean
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a numeric type data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushNumeric
+FUNCTION le_result_t PushNumeric
 (
     string path[MAX_RESOURCE_PATH_LEN] IN,///< Resource path within the client app's namespace.
     double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -520,9 +560,21 @@ FUNCTION PushNumeric
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a string type data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushString
+FUNCTION le_result_t PushString
 (
     string path[MAX_RESOURCE_PATH_LEN] IN,///< Resource path within the client app's namespace.
     double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -534,9 +586,21 @@ FUNCTION PushString
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a JSON data sample.
+ *
+ * @note The LE_OK return from this function means the sample has been successfully received by
+ * datahub. It does not guarantee that the sample will be successfully processed by observers
+ * of the path or that the sample will not be lost after power cycle.
+ *
+ * @return
+ *      - LE_OK If datasample was pushed successfully.
+ *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
+ *      - LE_IN_PROGRESS If Push is rejected because a configuration update is in progress.
+ *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
+ *      - LE_NOT_FOUND If the path does not exist.
+ *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION PushJson
+FUNCTION le_result_t PushJson
 (
     string path[MAX_RESOURCE_PATH_LEN] IN,///< Resource path within the client app's namespace.
     double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
@@ -681,10 +745,16 @@ FUNCTION MarkOptional
 /**
  * Set a Boolean type value as the default value of a given resource.
  *
- * @note This will be ignored if the resource already has a default value.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NOT_FOUND If path does not exist.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_DUPLICATE If resource already has a default value.
+ *      - LE_FAULT For any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetBooleanDefault
+FUNCTION le_result_t SetBooleanDefault
 (
     string path[MAX_RESOURCE_PATH_LEN] IN,///< Resource path within the client app's namespace.
     bool value IN
@@ -695,10 +765,16 @@ FUNCTION SetBooleanDefault
 /**
  * Set a numeric type value as the default value of a given resource.
  *
- * @note This will be ignored if the resource already has a default value.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NOT_FOUND If path does not exist.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_DUPLICATE If resource already has a default value.
+ *      - LE_FAULT For any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetNumericDefault
+FUNCTION le_result_t SetNumericDefault
 (
     string path[MAX_RESOURCE_PATH_LEN] IN,///< Resource path within the client app's namespace.
     double value IN
@@ -709,10 +785,16 @@ FUNCTION SetNumericDefault
 /**
  * Set a string type value as the default value of a given resource.
  *
- * @note This will be ignored if the resource already has a default value.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NOT_FOUND If path does not exist.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
+ *      - LE_DUPLICATE If resource already has a default value.
+ *      - LE_FAULT For any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetStringDefault
+FUNCTION le_result_t SetStringDefault
 (
     string path[MAX_RESOURCE_PATH_LEN] IN,///< Resource path within the client app's namespace.
     string value[MAX_STRING_VALUE_LEN] IN
@@ -723,10 +805,17 @@ FUNCTION SetStringDefault
 /**
  * Set a JSON type value as the default value of a given resource.
  *
- * @note This will be ignored if the resource already has a default value.
+ * @return
+ *      - LE_OK If setting default was successful.
+ *      - LE_NOT_FOUND If path does not exist.
+ *      - LE_NO_MEMORY If could not set default value due to lack of memory.
+ *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch or JSON is
+ *          invalid.
+ *      - LE_DUPLICATE If resource already has a default value.
+ *      - LE_FAULT For any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetJsonDefault
+FUNCTION le_result_t SetJsonDefault
 (
     string path[MAX_RESOURCE_PATH_LEN] IN,///< Resource path within the client app's namespace.
     string value[MAX_STRING_VALUE_LEN] IN
