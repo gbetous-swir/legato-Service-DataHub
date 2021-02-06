@@ -20,7 +20,6 @@
 typedef struct handler
 {
     le_dls_Link_t link; ///< Used to link into one of the I/O resource's lists of handlers.
-    void* safeRef;      ///< Safe reference passed to client.
     le_dls_List_t* listPtr; ///< Ptr to the list this handler is on.
     io_DataType_t dataType;    ///< Data type of the handler callback (only for Push handlers).
     void* callbackPtr;  ///< The callback function pointer.
@@ -31,9 +30,6 @@ Handler_t;
 /// Default number of push handlers.  This can be overridden in the .cdef.
 #define DEFAULT_PUSH_HANDLER_POOL_SIZE  10
 
-/// Size of the push handler reference map.
-#define PUSH_HANDLER_MAP_SIZE           LE_MEM_BLOCKS(HandlerPool, DEFAULT_PUSH_HANDLER_POOL_SIZE)
-
 //--------------------------------------------------------------------------------------------------
 /**
  * Pool from which Handler objects are allocated.
@@ -41,17 +37,6 @@ Handler_t;
 //--------------------------------------------------------------------------------------------------
 static le_mem_PoolRef_t HandlerPool = NULL;
 LE_MEM_DEFINE_STATIC_POOL(HandlerPool, DEFAULT_PUSH_HANDLER_POOL_SIZE, sizeof(Handler_t));
-
-
-//--------------------------------------------------------------------------------------------------
-/**
- * Safe reference map for Handler objects.  Used to generate safe references to pass to clients
- * when they register Poll and Push handler call-backs.
- */
-//--------------------------------------------------------------------------------------------------
-static le_ref_MapRef_t HandlerRefMap = NULL;
-LE_REF_DEFINE_STATIC_MAP(HandlerRefMap, PUSH_HANDLER_MAP_SIZE);
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -78,8 +63,6 @@ void handler_Init
 #endif
     HandlerPool = le_mem_InitStaticPool(HandlerPool, DEFAULT_PUSH_HANDLER_POOL_SIZE,
                     sizeof(Handler_t));
-
-    HandlerRefMap = le_ref_InitStaticMap(HandlerRefMap, PUSH_HANDLER_MAP_SIZE);
 }
 
 
@@ -108,7 +91,6 @@ hub_HandlerRef_t handler_Add
     }
 
     handlerPtr->link = LE_DLS_LINK_INIT;
-    handlerPtr->safeRef = le_ref_CreateRef(HandlerRefMap, handlerPtr);
     handlerPtr->listPtr = listPtr;
     handlerPtr->dataType = dataType;
     handlerPtr->callbackPtr = callbackPtr;
@@ -116,9 +98,9 @@ hub_HandlerRef_t handler_Add
 
     le_dls_Queue(listPtr, &handlerPtr->link);
 
-    LE_DEBUG("Added Handler %p for %d", (hub_HandlerRef_t)handlerPtr->safeRef, dataType);
+    LE_DEBUG("Added Handler %p for %d", (hub_HandlerRef_t)handlerPtr, dataType);
 
-    return (hub_HandlerRef_t)(handlerPtr->safeRef);
+    return (hub_HandlerRef_t)(handlerPtr);
 }
 
 
@@ -135,8 +117,7 @@ static void DeleteHandler
 )
 //--------------------------------------------------------------------------------------------------
 {
-    LE_DEBUG("Deleting handler %p", handlerPtr->safeRef);
-    le_ref_DeleteRef(HandlerRefMap, handlerPtr->safeRef);
+    LE_DEBUG("Deleting handler %p", handlerPtr);
 
     le_mem_Release(handlerPtr);
 }
@@ -157,7 +138,7 @@ le_result_t handler_Remove
 )
 //--------------------------------------------------------------------------------------------------
 {
-    Handler_t* handlerPtr = le_ref_Lookup(HandlerRefMap, handlerRef);
+    Handler_t* handlerPtr = (Handler_t*) handlerRef;
     le_result_t ret = LE_OK;
     if (handlerPtr != NULL)
     {
@@ -313,7 +294,7 @@ void handler_Call
 )
 //--------------------------------------------------------------------------------------------------
 {
-    Handler_t* handlerPtr = le_ref_Lookup(HandlerRefMap, handlerRef);
+    Handler_t* handlerPtr = (Handler_t*) handlerRef;
     if (handlerPtr == NULL)
     {
         LE_CRIT("Invalid handler reference %p", handlerRef);
