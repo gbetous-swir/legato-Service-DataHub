@@ -65,6 +65,11 @@ Object;
 //--------------------------------------------------------------------------------------------------
 static bool UseJsonFormat = false;
 
+/**
+ * Flag indicating whether or not the data intput should be a FILE.
+ */
+//--------------------------------------------------------------------------------------------------
+static bool ReadFromFile = false;
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -96,6 +101,7 @@ static void HandleHelpRequest
         "    dhub set jsonExtraction PATH\n"
         "    dhub remove OBJECT PATH\n"
         "    dhub push PATH [[--json] VALUE]\n"
+        "    dhub push PATH --file [--json] FILE_PATH\n"
         "    dhub watch [--json] PATH\n"
         "    dhub get OBJECT PATH [START]\n"
         "    dhub read PATH [START]\n"
@@ -193,12 +199,17 @@ static void HandleHelpRequest
         "            attached to it.\n"
         "\n"
         "    dhub push PATH [[--json] VALUE]\n"
-        "            Pushes a VALUE to the the resource at PATH. If VALUE is omitted,\n"
+        "            Pushes a VALUE to the resource at PATH. If VALUE is omitted,\n"
         "            a trigger is pushed.  If VALUE is specified, --json (or -j) can\n"
         "            optionally be used to specify that the VALUE should be pushed as\n"
         "            JSON; otherwise the type will be inferred (i.e., 'true' and\n"
         "            'false' are treated as Boolean, numbers are treated as numerical,\n"
         "            and everything else is treated as a string.\n"
+        "\n"
+        "    dhub push PATH --file [--json] FILE_PATH\n"
+        "            Pushes content of FILE_PATH to the resource at PATH, --json (or -j)\n"
+        "            can optionally be used to specify that the file should be pushed\n"
+        "            as JSON; otherwise the file will treated as a string.\n"
         "\n"
         "    dhub watch [--json] PATH\n"
         "           Register for notification of updates to a resource at PATH.\n"
@@ -1325,6 +1336,75 @@ static void SetDefault
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Push value of the resource using a local file
+ */
+//--------------------------------------------------------------------------------------------------
+static void PushFile
+(
+    void
+)
+//--------------------------------------------------------------------------------------------------
+{
+    le_result_t result = LE_FAULT;
+    char dataFileBuffer[IO_MAX_STRING_VALUE_LEN] = {0};
+    size_t fileSize;
+
+    if (ValueArg == NULL)
+    {
+        fprintf(stderr, "Missing FILE_PATH argument.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    result = le_fs_GetSize(ValueArg, &fileSize);
+    if (result == LE_OK)
+    {
+        if (fileSize > IO_MAX_STRING_VALUE_LEN)
+        {
+            result = LE_OVERFLOW;
+            fprintf(stderr, "Error '%s' too big to be loaded\n", ValueArg);
+            exit(EXIT_FAILURE);
+        }
+        else
+        {
+            le_fs_FileRef_t fileRef;
+            result = le_fs_Open(ValueArg, LE_FS_RDONLY, &fileRef);
+            if (result == LE_OK)
+            {
+                result = le_fs_Read(fileRef, (uint8_t *)dataFileBuffer, &fileSize);
+                if (result != LE_OK)
+                {
+                    fprintf(stderr, "Error reading file %s (%s)\n", ValueArg, LE_RESULT_TXT(result));
+                    exit(EXIT_FAILURE);
+                }
+
+                result = le_fs_Close(fileRef);
+                if (result != LE_OK)
+                {
+                    fprintf(stderr, "Error closing file %s (%s)\n", ValueArg, LE_RESULT_TXT(result));
+                    exit(EXIT_FAILURE);
+                }
+            }
+        }
+    }
+    else
+    {
+        fprintf(stderr, "Error failed to get file size %s (%s)\n", ValueArg, LE_RESULT_TXT(result));
+        exit(EXIT_FAILURE);
+    }
+
+    if (UseJsonFormat)
+    {
+        admin_PushJson(PathArg, IO_NOW, dataFileBuffer);
+    }
+    else
+    {
+        admin_PushString(PathArg, IO_NOW, dataFileBuffer);
+    }
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Set the default value of a resource.
  */
 //--------------------------------------------------------------------------------------------------
@@ -1340,8 +1420,12 @@ static void Push
         exit(EXIT_FAILURE);
     }
 
+    if (ReadFromFile)
+    {
+        PushFile();
+    }
     // If no value was specified, push a trigger.
-    if (ValueArg == NULL)
+    else if (ValueArg == NULL)
     {
         admin_PushTrigger(PathArg, IO_NOW);
     }
@@ -1823,9 +1907,11 @@ static void CommandArgHandler
     {
         Action = ACTION_PUSH;
 
-        // Expect a path argument and optional --json (-j) flag.
+        // Expect a path argument and  optional :
+        // --json (-j) or --file (-f) flag
         le_arg_AddPositionalCallback(PathArgHandler);
         le_arg_SetFlagVar(&UseJsonFormat, "j", "json");
+        le_arg_SetFlagVar(&ReadFromFile, "f", "file");
     }
     else if (strcmp(arg, "remove") == 0)
     {
