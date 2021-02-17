@@ -144,25 +144,86 @@ res_Resource_t* res_CreateObservation
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Create an IO Placeholder resource object.
+ *
+ * @return Ptr to the object, or NULL if failed to create one.
+ */
+//--------------------------------------------------------------------------------------------------
+res_Resource_t* res_CreateIoPlaceholder
+(
+    resTree_EntryRef_t entryRef ///< The entry that this resource will be attached to.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Create an observation Placeholder resource object.
+ *
+ * @return Ptr to the object, or NULL if failed to create one.
+ */
+//--------------------------------------------------------------------------------------------------
+res_Resource_t* res_CreateObsPlaceholder
+(
+    resTree_EntryRef_t entryRef ///< The entry that this resource will be attached to.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Convert a placeholder resource to an Input resource.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ConvertPlaceholderToInput
+(
+    res_Resource_t* resPtr,     ///< Pointer to resource
+    io_DataType_t dataType,     ///< IO data type
+    const char* units           ///< Io resource units
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Convert a placeholder resource to an Output resource.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ConvertPlaceholderToOutput
+(
+    res_Resource_t* resPtr,     ///< Pointer to resource
+    io_DataType_t dataType,     ///< IO data type
+    const char* units           ///< Io resource units
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Convert a placeholder resource to an Observation resource.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ConvertPlaceholderToObs
+(
+    res_Resource_t* resPtr     ///< Pointer to resource
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Converts an IO resource that is being deleted to a placeholder.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ConvertIoToPlaceholder
+(
+    res_Resource_t* resPtr     ///< Pointer to resource
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Restore an Observation's data buffer from non-volatile backup, if one exists.
  */
 //--------------------------------------------------------------------------------------------------
 void res_RestoreBackup
 (
     res_Resource_t* resPtr
-);
-
-
-//--------------------------------------------------------------------------------------------------
-/**
- * Create a Placeholder resource object.
- *
- * @return Ptr to the object.
- */
-//--------------------------------------------------------------------------------------------------
-res_Resource_t* res_CreatePlaceholder
-(
-    resTree_EntryRef_t entryRef ///< The entry that this resource will be attached to.
 );
 
 
@@ -322,19 +383,6 @@ hub_HandlerRef_t res_AddPushHandler
 bool res_HasAdminSettings
 (
     res_Resource_t* resPtr
-);
-
-
-//--------------------------------------------------------------------------------------------------
-/**
- * Move all the administrative settings from one Resource object to another.
- */
-//--------------------------------------------------------------------------------------------------
-void res_MoveAdminSettings
-(
-    res_Resource_t* srcPtr,   ///< Move settings from this resource
-    res_Resource_t* destPtr,  ///< Move settings to this resource
-    admin_EntryType_t replacementType ///< The type of the replacement resource.
 );
 
 

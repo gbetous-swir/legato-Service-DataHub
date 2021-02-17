@@ -47,23 +47,6 @@ LE_MEM_DEFINE_STATIC_POOL(ResourceTreeChangeHandlerPool,
 //--------------------------------------------------------------------------------------------------
 static unsigned int PushHandlerCount;
 
-//--------------------------------------------------------------------------------------------------
-/**
- * @return A reference to the '/obs' namespace.  Creates it if necessary.
- */
-//--------------------------------------------------------------------------------------------------
-static resTree_EntryRef_t GetObsNamespace
-(
-    void
-)
-//--------------------------------------------------------------------------------------------------
-{
-    resTree_EntryRef_t obsNamespace;
-    LE_ASSERT(resTree_GetEntry(resTree_GetRoot(), "obs", &obsNamespace) == LE_OK);
-    LE_ASSERT(obsNamespace != NULL);
-
-    return obsNamespace;
-}
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -764,7 +747,7 @@ static resTree_EntryRef_t GetObservation
         return NULL;
     }
     resTree_EntryRef_t entryRef;
-    if (resTree_GetObservation(GetObsNamespace(), path, &entryRef) == LE_OK)
+    if (resTree_GetObservation(resTree_GetObsNamespace(), path, &entryRef) == LE_OK)
     {
         return entryRef;
     }
@@ -797,7 +780,7 @@ static resTree_EntryRef_t FindObservation
         return NULL;
     }
 
-    resTree_EntryRef_t entryRef = resTree_FindEntry(GetObsNamespace(), path);
+    resTree_EntryRef_t entryRef = resTree_FindEntry(resTree_GetObsNamespace(), path);
 
     if (resTree_GetEntryType(entryRef) != ADMIN_ENTRY_TYPE_OBSERVATION)
     {

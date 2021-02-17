@@ -170,7 +170,7 @@ le_result_t io_CreateInput
             case ADMIN_ENTRY_TYPE_NAMESPACE:
             case ADMIN_ENTRY_TYPE_PLACEHOLDER:
 
-                // These can be upgraded to Input objects by resTree_GetInput().
+                // These can be upgraded to Input objects by resTree_CreateInput().
                 break;
 
             case ADMIN_ENTRY_TYPE_NONE:
@@ -180,9 +180,9 @@ le_result_t io_CreateInput
     }
 
     // Get/Create the Input resource.
-    le_result_t res = resTree_GetInput(nsRef, path, dataType, units, &resRef);
+    le_result_t res = resTree_CreateInput(nsRef, path, dataType, units);
 
-    if (resRef == NULL || res != LE_OK)
+    if (res != LE_OK)
     {
         LE_ERROR("Failed to create Input '/app/%s/%s'.", resTree_GetEntryName(nsRef), path);
         return res;
@@ -293,7 +293,7 @@ le_result_t io_CreateOutput
             case ADMIN_ENTRY_TYPE_NAMESPACE:
             case ADMIN_ENTRY_TYPE_PLACEHOLDER:
 
-                // These can be upgraded to Output objects by resTree_GetOutput().
+                // These can be upgraded to Output objects by resTree_CreateOutput().
                 break;
 
             case ADMIN_ENTRY_TYPE_NONE:
@@ -303,8 +303,8 @@ le_result_t io_CreateOutput
     }
 
     // Create the Output resource.
-    le_result_t res = resTree_GetOutput(nsRef, path, dataType, units, &resRef);
-    if (resRef == NULL || res != LE_OK)
+    le_result_t res = resTree_CreateOutput(nsRef, path, dataType, units);
+    if (res != LE_OK)
     {
         LE_ERROR("Failed to create Output '/app/%s/%s'.", resTree_GetEntryName(nsRef), path);
         return res;

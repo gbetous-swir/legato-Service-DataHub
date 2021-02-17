@@ -230,57 +230,47 @@ le_result_t resTree_GetResource
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Get a reference to an Input resource at a given path.
- * Creates a new Input resource if nothing exists at that path.
+ * Creates a new Input resource at the given path.
  * Also creates parent, grandparent, etc. Namespaces, as needed.
  *
- * If there's already a Namespace or Placeholder at the given path, it will be deleted and
- * replaced by an Input.
+ * If there's already a Namespace or Placeholder at the given path, it will be converted to an
+ * Input. Should not be called if there's already an IO resource or observation at that path.
  *
  * @return
  *      - LE_OK If successful.
- *      - LE_NO_MEMORY If getting input required creating a new input but there was no memory to
- *          allocate the input.
- *      - LE_BAD_PARAMETER If path is malformed, an Output or Observation
- *         already exists at that location, or an Input with different units or data type already
- *         exists at that location
+ *      - LE_NO_MEMORY If there was no memory to allocate the input.
+ *      - LE_BAD_PARAMETER If path is malformed.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t resTree_GetInput
+le_result_t resTree_CreateInput
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path,       ///< Path.
     io_DataType_t dataType, ///< The data type.
-    const char* units,       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
-    resTree_EntryRef_t* entryRefPtr ///<[OUT] Pointer to write reference to object to.
+    const char* units       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
 );
 
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Get a reference to an Output resource at a given path.
- * Creates a new Output resource if nothing exists at that path.
+ * Creates a new Output resource at the given path.
  * Also creates parent, grandparent, etc. Namespaces, as needed.
  *
- * If there's already a Namespace or Placeholder at the given path, it will be deleted and
- * replaced by an Output.
+ * If there's already a Namespace or Placeholder at the given path, it will be converted to an
+ * Output. Should not be called if there's already an IO resource or observation at that path.
  *
  * @return
  *      - LE_OK If successful.
- *      - LE_NO_MEMORY If getting input required creating a new input but there was no memory to
- *          allocate the input.
- *      - LE_BAD_PARAMETER If path is malformed, an Output or Observation
- *         already exists at that location, or an Input with different units or data type already
- *         exists at that location
+ *      - LE_NO_MEMORY If there was no memory to allocate the output.
+ *      - LE_BAD_PARAMETER If path is malformed.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t resTree_GetOutput
+le_result_t resTree_CreateOutput
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path,       ///< Path.
     io_DataType_t dataType, ///< The data type.
-    const char* units,      ///< Units string, e.g., "degC" (see senml); "" = unspecified.
-    resTree_EntryRef_t* entryRefPtr ///<[OUT] Pointer to write reference to object to.
+    const char* units       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
 );
 
 
@@ -305,6 +295,19 @@ le_result_t resTree_GetObservation
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path,                 ///< Path.
     resTree_EntryRef_t* entryRefPtr   ///<[OUT] Pointer to write reference to object to.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Get observations base namespace entry, the /obs/ path. Creates it if necessary.
+ *
+ * @return Reference to observations base namespace entry.
+ */
+//--------------------------------------------------------------------------------------------------
+resTree_EntryRef_t resTree_GetObsNamespace
+(
+    void
 );
 
 

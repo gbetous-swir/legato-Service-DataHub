@@ -92,17 +92,4 @@ void handler_CallAll
     dataSample_Ref_t sampleRef      ///< Data Sample to pass to the push handlers that are called.
 );
 
-
-//--------------------------------------------------------------------------------------------------
-/**
- * Move all handlers from one list to another.
- */
-//--------------------------------------------------------------------------------------------------
-void handler_MoveAll
-(
-    le_dls_List_t* destListPtr,
-    le_dls_List_t* srcListPtr
-);
-
-
 #endif // HANDLER_H_INCLUDE_GUARD

@@ -397,61 +397,86 @@ cleanup:
     return NULL;
 }
 
+
 //--------------------------------------------------------------------------------------------------
 /**
- * Replace the resource attached to an entry with another resource.
- * The original resource is deleted.
+ *  Get entry type string
+ *
+ *  @return entry type string.
  */
 //--------------------------------------------------------------------------------------------------
-static void ReplaceResource
+static const char* GetEntryTypeName
 (
-    resTree_EntryRef_t entryRef,    ///< Replace the resource attached to this entry
-    res_Resource_t* replacementPtr, ///< With this resource
-    admin_EntryType_t replacementType ///< The type of the replacement resource.
+    admin_EntryType_t entryType
 )
 //--------------------------------------------------------------------------------------------------
 {
-    // If we're replacing an existing Resource with another type, move Resource settings over.
-    if (entryRef->type != ADMIN_ENTRY_TYPE_NAMESPACE)
+    switch(entryType)
     {
-        if (entryRef->u.resourcePtr != NULL)
-        {
-            // Note that this may result in lost settings. For example, Placeholders don't have
-            // filter settings, but Observations do, so moving settings from an Observation to a
-            // Placeholder will lose the Observation's filter settings.
-            res_MoveAdminSettings(entryRef->u.resourcePtr, replacementPtr, replacementType);
-
-            // Delete the original resource.
-            le_mem_Release(entryRef->u.resourcePtr);
-        }
+        case (ADMIN_ENTRY_TYPE_NAMESPACE):
+            return "Namespace";
+        case (ADMIN_ENTRY_TYPE_PLACEHOLDER):
+            return "Placeholder";
+        case (ADMIN_ENTRY_TYPE_INPUT):
+            return "Input";
+        case (ADMIN_ENTRY_TYPE_OUTPUT):
+            return "Output";
+        case (ADMIN_ENTRY_TYPE_OBSERVATION):
+            return "Observation";
+        default:
+            return "InvalidType";
     }
-
-    entryRef->u.resourcePtr = replacementPtr;
-    entryRef->type = replacementType;
 }
 
+
 //--------------------------------------------------------------------------------------------------
 /**
- * Replace an entry with a placeholder
+ * Creates a placeholder resource and attaches it to a namespace entry.
+ *
+ * entryRef must be a namespace entry. The placeholder will either be an IoResource placeholder or
+ * an observation placeholder depending the namespace and path.
+ *
+ * @return
+ *      - LE_OK Successfully created and attached placeholder.
+ *      - LE_NO_MEMORY Failed to allocate memory for placeholder.
  */
 //--------------------------------------------------------------------------------------------------
-void ReplaceWithPlaceholder
+static le_result_t CreatePlaceholderForNamespace
 (
-    resTree_EntryRef_t entryRef ///< reference to entry being replaced
+    resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
+    const char* path,                 ///< Path that this resource will have.
+    resTree_EntryRef_t entryRef       ///< entry to attach this placeholder to
 )
 //--------------------------------------------------------------------------------------------------
 {
-    res_Resource_t* placeholderPtr = res_CreatePlaceholder(entryRef);
-    if (placeholderPtr)
+    LE_ASSERT(entryRef->type == ADMIN_ENTRY_TYPE_NAMESPACE);
+    le_result_t ret = LE_OK;
+    // need to determine if this placeholder is for an observation for an io resource.
+
+    res_Resource_t* placeholderPtr;
+    if ((baseNamespace == resTree_GetObsNamespace()) || (strncmp(path, "/obs/", 5) == 0))
     {
-        ReplaceResource(entryRef, placeholderPtr, ADMIN_ENTRY_TYPE_PLACEHOLDER);
+        // place holder for an observation
+        placeholderPtr = res_CreateObsPlaceholder(entryRef);
     }
     else
     {
-        // unable to allocate a placeholder resource, reuse the entry itself as placeholder:
+        //place holder for an io resource.
+        placeholderPtr = res_CreateIoPlaceholder(entryRef);
+    }
+    if (placeholderPtr)
+    {
+        entryRef->u.resourcePtr = placeholderPtr;
         entryRef->type = ADMIN_ENTRY_TYPE_PLACEHOLDER;
     }
+    else
+    {
+        LE_ERROR("Failed to allocate a placeholder for %s", path);
+        ret = LE_NO_MEMORY;
+    }
+    return ret;
 }
+
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -469,6 +494,27 @@ static void CallResourceTreeChangeHandlers
     char absolutePath[HUB_MAX_RESOURCE_PATH_BYTES];
     resTree_GetPath(absolutePath, HUB_MAX_RESOURCE_PATH_BYTES, RootPtr, entryRef);
     admin_CallResourceTreeChangeHandlers(absolutePath, entryType, resourceOperationType);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Get observations base namespace entry, the /obs/ path. Creates it if necessary.
+ *
+ * @return Reference to observations base namespace entry.
+ */
+//--------------------------------------------------------------------------------------------------
+resTree_EntryRef_t resTree_GetObsNamespace
+(
+    void
+)
+//--------------------------------------------------------------------------------------------------
+{
+    resTree_EntryRef_t obsNamespace;
+    LE_ASSERT(resTree_GetEntry(resTree_GetRoot(), "obs", &obsNamespace) == LE_OK);
+    LE_ASSERT(obsNamespace != NULL);
+
+    return obsNamespace;
 }
 
 
@@ -663,6 +709,7 @@ le_result_t resTree_GetResource
 {
     resTree_EntryRef_t entryRef;
     le_result_t ret = LE_OK;
+    bool createdEntry = false;
 
     if (hub_IsResourcePathMalformed(path))
     {
@@ -674,19 +721,26 @@ le_result_t resTree_GetResource
         if (entryRef == NULL)
         {
             entryRef = CreateEntry(baseNamespace, path);
+            if (entryRef)
+            {
+                createdEntry = true;
+            }
+            else
+            {
+                ret = LE_NO_MEMORY;
+            }
         }
 
-        if (entryRef == NULL)
-        {
-            ret = LE_NO_MEMORY;
-        }
-        else
+        if (entryRef)
         {
             // If a Namespace currently resides at that spot in the tree,
             // replace it with a Placeholder.
             if (entryRef->type == ADMIN_ENTRY_TYPE_NAMESPACE)
             {
-                ReplaceWithPlaceholder(entryRef);
+                if (CreatePlaceholderForNamespace(baseNamespace, path, entryRef) != LE_OK)
+                {
+                    ret = LE_NO_MEMORY;
+                }
             }
         }
     }
@@ -697,6 +751,10 @@ le_result_t resTree_GetResource
     else
     {
         *entryRefPtr = NULL;
+        if (createdEntry)
+        {
+            le_mem_Release(entryRef);
+        }
     }
     return ret;
 }
@@ -704,223 +762,96 @@ le_result_t resTree_GetResource
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Get a reference to an Input resource at a given path.
- * Creates a new Input resource if nothing exists at that path.
+ * Creates a new Input resource at the given path.
  * Also creates parent, grandparent, etc. Namespaces, as needed.
  *
- * If there's already a Namespace or Placeholder at the given path, it will be deleted and
- * replaced by an Input.
+ * If there's already a Namespace or Placeholder at the given path, it will be converted to an
+ * Input. Should not be called if there's already a IO resource or observation at that path.
  *
  * @return
  *      - LE_OK If successful.
- *      - LE_NO_MEMORY If getting input required creating a new input but there was no memory to
- *          allocate the input.
- *      - LE_BAD_PARAMETER If path is malformed, an Output or Observation
- *         already exists at that location, or an Input with different units or data type already
- *         exists at that location
+ *      - LE_NO_MEMORY If there was no memory to allocate the input.
+ *      - LE_BAD_PARAMETER If path is malformed.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t resTree_GetInput
+le_result_t resTree_CreateInput
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path,       ///< Path.
     io_DataType_t dataType, ///< The data type.
-    const char* units,       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
-    resTree_EntryRef_t* entryRefPtr ///<[OUT] Pointer to write reference to object to.
+    const char* units       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
 )
 //--------------------------------------------------------------------------------------------------
 {
-    bool createdEntry = false;
+    // Always call resTree_GetResource and expect a place holder. resTree_CreateInput should not be
+    // called if there's another IO or observation already at that path.
+    // If there was nothing at the path, resTree_GetResource will have created a placeholder there.
+    // So we always expect a placeholder from resTree_GetResource.
+    // Will just have to convert that place holder to an input resource.
+
+    le_result_t ret;
     resTree_EntryRef_t entryRef = NULL;
-    le_result_t ret = LE_OK;
+    ret = resTree_GetResource(baseNamespace, path, &entryRef);
 
-    if (hub_IsResourcePathMalformed(path))
+    if (ret != LE_OK)
     {
-        return LE_BAD_PARAMETER;
+        return ret;
     }
 
-    entryRef = FindEntry(baseNamespace, path);
-    if (entryRef == NULL)
-    {
-        entryRef = CreateEntry(baseNamespace, path);
-        if (entryRef)
-        {
-            createdEntry = true;
-        }
-        else
-        {
-            return LE_NO_MEMORY;
-        }
-    }
+    LE_ASSERT(entryRef->type == ADMIN_ENTRY_TYPE_PLACEHOLDER);
 
-    switch (entryRef->type)
-    {
-        // If a Namespace or Placeholder currently resides at that spot in the tree,
-        // replace it with an Input.
-        // NOTE: If a new entry was created for this, it will be a Namespace entry.
-        case ADMIN_ENTRY_TYPE_NAMESPACE:
-        case ADMIN_ENTRY_TYPE_PLACEHOLDER:
-        {
-            res_Resource_t* resPtr = res_CreateInput(entryRef, dataType, units);
-            if (resPtr)
-            {
-                ReplaceResource(entryRef, resPtr, ADMIN_ENTRY_TYPE_INPUT);
-
-                CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_INPUT,
+    entryRef->type = ADMIN_ENTRY_TYPE_INPUT;
+    res_ConvertPlaceholderToInput(entryRef->u.resourcePtr, dataType, units);
+    CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_INPUT,
                                                ADMIN_RESOURCE_ADDED);
-
-                *entryRefPtr = entryRef;
-            }
-            else
-            {
-                ret = LE_NO_MEMORY;
-            }
-            break;
-        }
-        case ADMIN_ENTRY_TYPE_INPUT:
-            LE_ERROR("Attempt to replace an Input with another Input.");
-            ret = LE_BAD_PARAMETER;
-            break;
-
-        case ADMIN_ENTRY_TYPE_OUTPUT:
-            LE_ERROR("Attempt to replace an Output with an Input.");
-            ret = LE_BAD_PARAMETER;
-            break;
-
-        case ADMIN_ENTRY_TYPE_OBSERVATION:
-            LE_ERROR("Attempt to replace an Observation with an Input.");
-            ret = LE_BAD_PARAMETER;
-            break;
-
-        case ADMIN_ENTRY_TYPE_NONE:
-            // This should never happen.
-            LE_FATAL("Unexpected entry type %d", entryRef->type);
-            break;
-    }
-
-    if (ret != LE_OK)
-    {
-        if (createdEntry)
-        {
-            le_mem_Release(entryRef);
-        }
-    }
     return ret;
 }
 
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Get a reference to an Output resource at a given path.
- * Creates a new Output resource if nothing exists at that path.
+ * Creates a new Output resource at the given path.
  * Also creates parent, grandparent, etc. Namespaces, as needed.
  *
- * If there's already a Namespace or Placeholder at the given path, it will be deleted and
- * replaced by an Output.
+ * If there's already a Namespace or Placeholder at the given path, it will be converted to an
+ * Output. Should not be called if there's already an IO resource or observation at that path.
  *
- *         already exists at that location, or an Output with different units or data type already
- *         exists at that location.
  * @return
  *      - LE_OK If successful.
- *      - LE_NO_MEMORY If getting input required creating a new input but there was no memory to
- *          allocate the input.
- *      - LE_BAD_PARAMETER If path is malformed, an Output or Observation
- *         already exists at that location, or an Input with different units or data type already
- *         exists at that location
+ *      - LE_NO_MEMORY If there was no memory to allocate the output.
+ *      - LE_BAD_PARAMETER If path is malformed.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t resTree_GetOutput
+le_result_t resTree_CreateOutput
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path,       ///< Path.
     io_DataType_t dataType, ///< The data type.
-    const char* units,      ///< Units string, e.g., "degC" (see senml); "" = unspecified.
-    resTree_EntryRef_t* entryRefPtr ///<[OUT] Pointer to write reference to object to.
+    const char* units       ///< Units string, e.g., "degC" (see senml); "" = unspecified.
 )
 //--------------------------------------------------------------------------------------------------
 {
-    bool createdEntry = false;
+    // Always call resTree_GetResource and expect a place holder. resTree_CreateInput should not be
+    // called if there's another IO or observation already at that path.
+    // If there was nothing at the path, resTree_GetResource will have created a placeholder there.
+    // So we always expect a placeholder from resTree_GetResource.
+    // Will just have to convert that place holder to an output resource.
+
+    le_result_t ret;
     resTree_EntryRef_t entryRef = NULL;
-    le_result_t ret = LE_OK;
+    ret = resTree_GetResource(baseNamespace, path, &entryRef);
 
-    if (hub_IsResourcePathMalformed(path))
-    {
-        ret = LE_BAD_PARAMETER;
-    }
-    else
-    {
-        entryRef = FindEntry(baseNamespace, path);
-        if (entryRef)
-        {
-            createdEntry = false;
-        }
-        else
-        {
-            entryRef = CreateEntry(baseNamespace, path);
-            if (entryRef)
-            {
-                createdEntry = true;
-            }
-        }
-
-        if (entryRef == NULL)
-        {
-            ret = LE_NO_MEMORY;
-        }
-        else
-        {
-            switch (entryRef->type)
-            {
-                // If a Namespace or Placeholder currently resides at that spot in the tree,
-                // replace it with an Output.
-                case ADMIN_ENTRY_TYPE_NAMESPACE:
-                case ADMIN_ENTRY_TYPE_PLACEHOLDER:
-                {
-
-                    res_Resource_t* resPtr = res_CreateOutput(entryRef, dataType, units);
-                    if (resPtr)
-                    {
-                        ReplaceResource(entryRef, resPtr, ADMIN_ENTRY_TYPE_OUTPUT);
-
-                        CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_OUTPUT,
-                                                       ADMIN_RESOURCE_ADDED);
-                        *entryRefPtr = entryRef;
-                    }
-                    else
-                    {
-                        ret = LE_NO_MEMORY;
-                    }
-                    break;
-                }
-                case ADMIN_ENTRY_TYPE_INPUT:
-                    LE_ERROR("Attempt to replace an Input with an Output.");
-                    ret = LE_BAD_PARAMETER;
-                    break;
-
-                case ADMIN_ENTRY_TYPE_OUTPUT:
-                    LE_ERROR("Attempt to replace an Output with another Output.");
-                    ret = LE_BAD_PARAMETER;
-                    break;
-
-                case ADMIN_ENTRY_TYPE_OBSERVATION:
-                    LE_ERROR("Attempt to replace an Observation with an Output.");
-                    ret = LE_BAD_PARAMETER;
-                    break;
-
-                case ADMIN_ENTRY_TYPE_NONE:
-                    // This should never happen.
-                    LE_FATAL("Unexpected entry type %d", entryRef->type);
-                    break;
-            }
-        }
-    }
     if (ret != LE_OK)
     {
-        if (createdEntry)
-        {
-            le_mem_Release(entryRef);
-        }
+        return ret;
     }
+
+    LE_ASSERT(entryRef->type == ADMIN_ENTRY_TYPE_PLACEHOLDER);
+
+    entryRef->type = ADMIN_ENTRY_TYPE_OUTPUT;
+    res_ConvertPlaceholderToOutput(entryRef->u.resourcePtr, dataType, units);
+    CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_OUTPUT,
+                                               ADMIN_RESOURCE_ADDED);
     return ret;
 }
 
@@ -949,86 +880,38 @@ le_result_t resTree_GetObservation
 )
 //--------------------------------------------------------------------------------------------------
 {
-    bool createdEntry = false;
-    le_result_t ret = LE_OK;
-    resTree_EntryRef_t entryRef;
-    if (hub_IsResourcePathMalformed(path))
-    {
-        ret = LE_BAD_PARAMETER;
-    }
-    else
-    {
-        entryRef = FindEntry(baseNamespace, path);
-        if (entryRef)
-        {
-            createdEntry = false;
-        }
-        else
-        {
-            entryRef = CreateEntry(baseNamespace, path);
-            if (entryRef)
-            {
-                createdEntry = true;
-            }
-        }
+    // Always call get resource, which will give you a resource, if there was already an observation
+    // resource there, we will just return it. If there was an IO resource then this function is
+    // supposed to return LE_NO_PARAMETER. If there was a place holder there it will give you that,
+    // if there was a namespace there, it will create a placeholder and then give you that.
+    // So out of getresource you'll always expect a placeholder or observation. If observation,
+    // return it, if placeholder, then just have to replace that placeholder with input.
+    le_result_t ret;
+    resTree_EntryRef_t entryRef = NULL;
+    ret = resTree_GetResource(baseNamespace, path, &entryRef);
 
-        if (entryRef == NULL)
-        {
-            ret = LE_NO_MEMORY;
-        }
-        else
-        {
-            // If a Namespace or Placeholder currently resides at that spot in the tree, replace it with
-            // an Observation.
-            switch (entryRef->type)
-            {
-                case ADMIN_ENTRY_TYPE_NAMESPACE:
-                case ADMIN_ENTRY_TYPE_PLACEHOLDER:
-                {
-                    res_Resource_t* obsPtr = res_CreateObservation(entryRef);
-                    if (obsPtr)
-                    {
-                        ReplaceResource(entryRef, obsPtr, ADMIN_ENTRY_TYPE_OBSERVATION);
-                        res_RestoreBackup(obsPtr);
-
-                        CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_OBSERVATION,
-                                                       ADMIN_RESOURCE_ADDED);
-                        *entryRefPtr = entryRef;
-                    }
-                    else
-                    {
-                        ret = LE_NO_MEMORY;
-                    }
-                    break;
-                }
-                case ADMIN_ENTRY_TYPE_INPUT:
-                    LE_ERROR("Attempt to replace an Input with an Observation.");
-                    ret = LE_BAD_PARAMETER;
-                    break;
-
-                case ADMIN_ENTRY_TYPE_OUTPUT:
-                    LE_ERROR("Attempt to replace an Output with an Observation.");
-                    ret = LE_BAD_PARAMETER;
-                    break;
-
-                case ADMIN_ENTRY_TYPE_OBSERVATION:
-                    *entryRefPtr = entryRef;
-                    break;
-
-                case ADMIN_ENTRY_TYPE_NONE:
-                    // This should never happen.
-                    LE_FATAL("Unexpected entry type %d", entryRef->type);
-                    break;
-            }
-        }
-    }
     if (ret != LE_OK)
     {
-        if (createdEntry)
-        {
-            le_mem_Release(entryRef);
-        }
+        return ret;
     }
+
+    if (entryRef->type == ADMIN_ENTRY_TYPE_PLACEHOLDER)
+    {
+        entryRef->type = ADMIN_ENTRY_TYPE_OBSERVATION;
+        res_ConvertPlaceholderToObs(entryRef->u.resourcePtr);
+
+        res_RestoreBackup(entryRef->u.resourcePtr);
+
+        CallResourceTreeChangeHandlers(entryRef, ADMIN_ENTRY_TYPE_OBSERVATION,
+                                                 ADMIN_RESOURCE_ADDED);
+    }
+    else if (entryRef->type != ADMIN_ENTRY_TYPE_OBSERVATION)
+    {
+        LE_ERROR("Attempt to replace a %s with an Observation.", GetEntryTypeName(entryRef->type));
+        return LE_BAD_PARAMETER;
+    }
+
+    *entryRefPtr = entryRef;
     return ret;
 }
 
@@ -1417,7 +1300,9 @@ void resTree_DeleteIO
     {
         // There are still administrative settings present on this resource, so replace it
         // with a Placeholder.
-        ReplaceWithPlaceholder(entryRef);
+        entryRef->type = ADMIN_ENTRY_TYPE_PLACEHOLDER;
+
+        res_ConvertIoToPlaceholder(ioPtr);
     }
     else
     {

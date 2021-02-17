@@ -331,24 +331,3 @@ void handler_CallAll
         linkPtr = le_dls_PeekNext(listPtr, linkPtr);
     }
 }
-
-
-//--------------------------------------------------------------------------------------------------
-/**
- * Move all handlers from one list to another.
- */
-//--------------------------------------------------------------------------------------------------
-void handler_MoveAll
-(
-    le_dls_List_t* destListPtr,
-    le_dls_List_t* srcListPtr
-)
-//--------------------------------------------------------------------------------------------------
-{
-    le_dls_Link_t* linkPtr;
-
-    while (NULL != (linkPtr = le_dls_Pop(srcListPtr)))
-    {
-        le_dls_Queue(destListPtr, linkPtr);
-    }
-}

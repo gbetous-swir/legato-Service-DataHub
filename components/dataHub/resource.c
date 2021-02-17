@@ -12,19 +12,8 @@
 #include "obs.h"
 #include "handler.h"
 
-/// Default number of placeholders.  This can be overridden in the .cdef.
-#define DEFAULT_PLACEHOLDER_POOL_SIZE   10
-
 /// true if an extended configuration update is in progress, false if in normal operating mode.
 static bool IsUpdateInProgress = false;
-
-
-/// Pool of Placeholder resource objects, which are instances of res_Resource_t.
-static le_mem_PoolRef_t PlaceholderPool = NULL;
-LE_MEM_DEFINE_STATIC_POOL(PlaceholderPool,
-                          DEFAULT_PLACEHOLDER_POOL_SIZE,
-                          sizeof(res_Resource_t));
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -38,9 +27,6 @@ void res_Init
     void
 )
 {
-    PlaceholderPool = le_mem_InitStaticPool(PlaceholderPool, DEFAULT_PLACEHOLDER_POOL_SIZE,
-                        sizeof(res_Resource_t));
-    le_mem_SetDestructor(PlaceholderPool, (void (*)())res_Destruct);
 }
 
 
@@ -233,6 +219,147 @@ res_Resource_t* res_CreateObservation
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Create an IO Placeholder resource object.
+ *
+ * @return Ptr to the object, or NULL if failed to create one.
+ */
+//--------------------------------------------------------------------------------------------------
+res_Resource_t* res_CreateIoPlaceholder
+(
+    resTree_EntryRef_t entryRef ///< The entry that this resource will be attached to.
+)
+//--------------------------------------------------------------------------------------------------
+{
+    return ioPoint_CreatePlaceholderIO(entryRef);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Create an observation Placeholder resource object.
+ *
+ * @return Ptr to the object, or NULL if failed to create one.
+ */
+//--------------------------------------------------------------------------------------------------
+res_Resource_t* res_CreateObsPlaceholder
+(
+    resTree_EntryRef_t entryRef ///< The entry that this resource will be attached to.
+)
+//--------------------------------------------------------------------------------------------------
+{
+    return obs_Create(entryRef);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Convert a placeholder resource to an Io resource.
+ */
+//--------------------------------------------------------------------------------------------------
+static void ConvertPlaceholderToIO
+(
+    res_Resource_t* resPtr,     ///< Pointer to resource
+    io_DataType_t dataType,     ///< IO data type
+    const char* units           ///< Io resource units
+)
+//--------------------------------------------------------------------------------------------------
+{
+    // Need to set type and units.
+    // Also need to make sure value doesn't need to be released.
+    if (dataType != resPtr->currentType && resPtr->currentValue)
+    {
+        le_mem_Release(resPtr->currentValue);
+        resPtr->currentValue = NULL;
+    }
+
+    resPtr->currentType = dataType;
+
+    SetUnits(resPtr, units);
+
+    LE_ASSERT(resPtr->jsonExample == NULL);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Convert a placeholder resource to an Input resource.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ConvertPlaceholderToInput
+(
+    res_Resource_t* resPtr,     ///< Pointer to resource
+    io_DataType_t dataType,     ///< IO data type
+    const char* units           ///< Io resource units
+)
+//--------------------------------------------------------------------------------------------------
+{
+    ConvertPlaceholderToIO(resPtr, dataType, units);
+    ioPoint_MakeResourceInput(resPtr, dataType);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Convert a placeholder resource to an Output resource.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ConvertPlaceholderToOutput
+(
+    res_Resource_t* resPtr,     ///< Pointer to resource
+    io_DataType_t dataType,     ///< IO data type
+    const char* units           ///< Io resource units
+)
+//--------------------------------------------------------------------------------------------------
+{
+    ConvertPlaceholderToIO(resPtr, dataType, units);
+    ioPoint_MakeResourceOutput(resPtr, dataType);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Convert a placeholder resource to an Observation resource.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ConvertPlaceholderToObs
+(
+    res_Resource_t* resPtr     ///< Pointer to resource
+)
+//--------------------------------------------------------------------------------------------------
+{
+    LE_ASSERT(resPtr->jsonExample == NULL);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Converts an IO resource that is being deleted to a placeholder.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_ConvertIoToPlaceholder
+(
+    res_Resource_t* resPtr     ///< Pointer to resource
+)
+//--------------------------------------------------------------------------------------------------
+{
+    if (resPtr->currentValue != NULL)
+    {
+        le_mem_Release(resPtr->currentValue);
+        resPtr->currentValue = NULL;
+    }
+
+    if (resPtr->jsonExample != NULL)
+    {
+        le_mem_Release(resPtr->jsonExample);
+        resPtr->jsonExample = NULL;
+    }
+
+    memset(resPtr->units, 0, HUB_MAX_UNITS_BYTES);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Restore an Observation's data buffer from non-volatile backup, if one exists.
  */
 //--------------------------------------------------------------------------------------------------
@@ -245,31 +372,6 @@ void res_RestoreBackup
     LE_ASSERT(resTree_GetEntryType(resPtr->entryRef) == ADMIN_ENTRY_TYPE_OBSERVATION);
 
     obs_RestoreBackup(resPtr);
-}
-
-
-//--------------------------------------------------------------------------------------------------
-/**
- * Create a Placeholder resource object.
- *
- * @return Ptr to the object, or NULL if failed to create one.
- */
-//--------------------------------------------------------------------------------------------------
-res_Resource_t* res_CreatePlaceholder
-(
-    resTree_EntryRef_t entryRef ///< The entry that this resource will be attached to.
-)
-//--------------------------------------------------------------------------------------------------
-{
-    res_Resource_t* resPtr = hub_MemAlloc(PlaceholderPool);
-    if (resPtr == NULL)
-    {
-        return NULL;
-    }
-
-    res_Construct(resPtr, entryRef);
-
-    return resPtr;
 }
 
 
@@ -770,103 +872,6 @@ bool res_HasAdminSettings
             || (resPtr->overrideValue != NULL) // Override
             || (resPtr->defaultValue != NULL) // Default
             || (! le_dls_IsEmpty(&resPtr->pushHandlerList)) ); // Push handlers
-}
-
-
-//--------------------------------------------------------------------------------------------------
-/**
- * Move the administrative settings from one Resource object to another of a different type.
- *
- * @note Inputs and Outputs don't have any special admin settings over and above the settings
- *       that all other types of resources have.  Furthermore, because we are never moving the
- *       settings between two resources of the same type, we don't have to move any
- *       Observation-specific settings.
- */
-//--------------------------------------------------------------------------------------------------
-void res_MoveAdminSettings
-(
-    res_Resource_t* srcPtr,   ///< Move settings from this entry
-    res_Resource_t* destPtr,  ///< Move settings to this entry
-    admin_EntryType_t replacementType ///< The type of the replacement resource.
-)
-//--------------------------------------------------------------------------------------------------
-{
-    LE_ASSERT(srcPtr->entryRef != NULL);
-    LE_ASSERT(destPtr->entryRef != NULL);
-
-    // If the destination is an Input or Output, it must be treated differently to other types
-    // of resources because the app that creates it has the final authority on what its data type
-    // and units are, and therefore we
-    //  - don't want to clobber whatever data type and units the app has specified for its I/O, and
-    //  - we have to check for data type compatibility before moving over the current value data
-    //    sample (if any) to an Input or an Output.
-    if ((replacementType == ADMIN_ENTRY_TYPE_INPUT) || (replacementType == ADMIN_ENTRY_TYPE_OUTPUT))
-    {
-        // If the old resource has a current value,
-        if (srcPtr->currentValue != NULL)
-        {
-            // If the data type is a match for the new resource, move the current value over.
-            if (srcPtr->currentType == destPtr->currentType)
-            {
-                destPtr->currentValue = srcPtr->currentValue;
-                srcPtr->currentValue = NULL; // dest took the reference count
-            }
-            else  // The data type doesn't match, so drop the old resource's current value.
-            {
-                le_mem_Release(srcPtr->currentValue);
-                srcPtr->currentValue = NULL;
-            }
-        }
-    }
-    else // *Not* an Input or Output,
-    {
-        // Copy over the units string.
-        SetUnits(destPtr, srcPtr->units);
-
-        // Move the current value (the new resource takes on the data type of the old resource).
-        destPtr->currentType = srcPtr->currentType;
-        destPtr->currentValue = srcPtr->currentValue;
-        srcPtr->currentValue = NULL; // dest took the reference count
-    }
-
-    // Move the last pushed value
-    destPtr->pushedType = srcPtr->pushedType;
-    destPtr->pushedValue = srcPtr->pushedValue;
-    srcPtr->pushedValue = NULL; // dest took the reference count
-
-    // Move the data source
-    destPtr->srcPtr = srcPtr->srcPtr;
-    srcPtr->srcPtr = NULL;
-    if (destPtr->srcPtr != NULL)
-    {
-        le_dls_Remove(&destPtr->srcPtr->destList, &srcPtr->destListLink);
-        le_dls_Queue(&destPtr->srcPtr->destList, &destPtr->destListLink);
-    }
-
-    // Move the list of destinations
-    le_dls_Link_t* linkPtr;
-    while ((linkPtr = le_dls_Pop(&srcPtr->destList)) != NULL)
-    {
-        res_Resource_t* routeDestPtr = CONTAINER_OF(linkPtr, res_Resource_t, destListLink);
-        le_dls_Queue(&destPtr->destList, linkPtr);
-        routeDestPtr->srcPtr = destPtr;
-    }
-
-    // Move the override
-    destPtr->overrideType = srcPtr->overrideType;
-    destPtr->overrideValue = srcPtr->overrideValue;
-    srcPtr->overrideValue = NULL;
-
-    // Move the default value
-    destPtr->defaultType = srcPtr->defaultType;
-    destPtr->defaultValue = srcPtr->defaultValue;
-    srcPtr->defaultValue = NULL;
-
-    // Move the flags.
-    destPtr->flags = srcPtr->flags;
-
-    // Move the push handler list.
-    handler_MoveAll(&destPtr->pushHandlerList, &srcPtr->pushHandlerList);
 }
 
 

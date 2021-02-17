@@ -51,6 +51,43 @@ res_Resource_t* ioPoint_CreateOutput
 
 //--------------------------------------------------------------------------------------------------
 /**
+ * Create a placeholder IO Resource.
+ *
+ * @return Pointer to the Resource or NULL if it failed to create a resource.
+ */
+//--------------------------------------------------------------------------------------------------
+res_Resource_t* ioPoint_CreatePlaceholderIO
+(
+    resTree_EntryRef_t entryRef ///< The resource tree entry to attach this Resource to.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Make a placeholder resource an input
+ */
+//--------------------------------------------------------------------------------------------------
+void ioPoint_MakeResourceInput
+(
+    res_Resource_t* resPtr,   ///< Pointer to resource
+    io_DataType_t dataType    ///< Io resource data type.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Make a placeholder resource an output
+ */
+//--------------------------------------------------------------------------------------------------
+void ioPoint_MakeResourceOutput
+(
+    res_Resource_t* resPtr,   ///< Pointer to resource
+    io_DataType_t dataType    ///< Io resource data type.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
  * Get the data type of an Input or Output resource.
  *
  * @return The data type.
