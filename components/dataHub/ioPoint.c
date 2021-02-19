@@ -211,6 +211,10 @@ le_result_t ioPoint_DoTypeCoercion
                 le_mem_Release(fromSample);
                 toSample = dataSample_CreateTrigger(timestamp);
             }
+            else
+            {
+                needsTypeConversion = false;
+            }
             break;
 
         case IO_DATA_TYPE_BOOLEAN:
