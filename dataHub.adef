@@ -33,6 +33,10 @@ processes:
         dataHub = ( hubd )
     }
 
+#if ${LE_CONFIG_RTOS} = y
+    maxStackBytes: 3072
+#endif
+
     faultAction: restart
 }
 
