@@ -511,7 +511,8 @@ static const char* GetMemberName
 {
     size_t i = 0;
 
-    while ((i < buffSize) && isalnum(*specPtr))
+    while ((i < buffSize) &&
+           (isalnum(*specPtr) || (*specPtr == '_') || (*specPtr == '-')))
     {
         *buffPtr = *specPtr;
 
