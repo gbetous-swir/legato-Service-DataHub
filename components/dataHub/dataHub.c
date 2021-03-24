@@ -32,6 +32,7 @@
 #include "ioService.h"
 #include "adminService.h"
 #include "snapshot.h"
+#include "configService.h"
 
 
 //--------------------------------------------------------------------------------------------------

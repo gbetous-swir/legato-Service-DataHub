@@ -254,20 +254,6 @@ dataSample_Ref_t dataSample_ExtractJson
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Create a copy of a Data Sample.
- *
- * @return Pointer to the new copy or NULL if failed to allocate memory for the copy.
- */
-//--------------------------------------------------------------------------------------------------
-dataSample_Ref_t dataSample_Copy
-(
-    io_DataType_t dataType,
-    dataSample_Ref_t original
-);
-
-
-//--------------------------------------------------------------------------------------------------
-/**
  * Set the timestamp of a Data Sample.
  */
 //--------------------------------------------------------------------------------------------------

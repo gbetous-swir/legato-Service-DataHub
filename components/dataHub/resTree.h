@@ -111,7 +111,7 @@ resTree_EntryRef_t resTree_FindChild
  * @return Reference to the object, or NULL if not found.
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_FindEntry
+LE_SHARED resTree_EntryRef_t resTree_FindEntry
 (
     resTree_EntryRef_t baseNamespace, ///< Reference to an entry the path is relative to.
     const char* path    ///< Path.
@@ -305,7 +305,7 @@ le_result_t resTree_GetObservation
  * @return Reference to observations base namespace entry.
  */
 //--------------------------------------------------------------------------------------------------
-resTree_EntryRef_t resTree_GetObsNamespace
+LE_SHARED resTree_EntryRef_t resTree_GetObsNamespace
 (
     void
 );
@@ -1197,6 +1197,44 @@ double resTree_QueryStdDev
 (
     resTree_EntryRef_t obsEntry,    ///< Observation entry.
     double startTime    ///< If < 30 years then seconds before now; else seconds since the Epoch.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ *  Mark an observation as config.
+ */
+//--------------------------------------------------------------------------------------------------
+void resTree_MarkObservationAsConfig
+(
+    resTree_EntryRef_t obsEntry    ///< Observation entry.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ *  Is an observation entry a config?
+ *
+ *  @return
+ *      - true if observation is config and false otherwise.
+ */
+//--------------------------------------------------------------------------------------------------
+bool resTree_IsObservationConfig
+(
+    resTree_EntryRef_t obsEntry    ///< Observation entry.
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Function to set the destination string for the specific Observation.
+ *
+ * @return none
+ */
+//--------------------------------------------------------------------------------------------------
+void resTree_SetDestination
+(
+    resTree_EntryRef_t obsEntry,  ///< Observation entry
+    const char* destination       ///< Destination string
 );
 
 #endif // NAMESPACE_H_INCLUDE_GUARD

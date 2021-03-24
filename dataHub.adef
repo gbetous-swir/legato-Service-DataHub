@@ -46,6 +46,7 @@ extern:
     hubd.dataHub.io
     hubd.dataHub.le_appInfo
     hubd.dataHub.query
+    hubd.dataHub.config
 
 #if ${DHUB_DISABLE_TOOLS} = 1
 #else

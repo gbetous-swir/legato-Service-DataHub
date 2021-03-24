@@ -677,6 +677,14 @@ static le_result_t UpdateCurrentValue
 
     // Call any the push handlers that match the data type of the sample.
     handler_CallAll(&resPtr->pushHandlerList, dataType, dataSample);
+
+    admin_EntryType_t type = resTree_GetEntryType(resPtr->entryRef);
+    if (type == ADMIN_ENTRY_TYPE_OBSERVATION)
+    {
+        // Call the destination push handler for this observation
+        obs_TriggerDestinationCallback(resPtr, dataType, dataSample);
+    }
+
     return res;
 }
 
@@ -759,12 +767,10 @@ le_result_t res_Push
     // original sample).
     if (res_IsOverridden(resPtr))
     {
-        dataSample_Ref_t overrideSample = dataSample_Copy(resPtr->overrideType,
-                                                          resPtr->overrideValue);
-        dataSample_SetTimestamp(overrideSample, dataSample_GetTimestamp(dataSample));
-        dataType = resPtr->overrideType;
+        dataSample_SetTimestamp(resPtr->overrideValue, dataSample_GetTimestamp(dataSample));
+        le_mem_AddRef(resPtr->overrideValue);
         le_mem_Release(dataSample);
-        dataSample = overrideSample;
+        dataSample = resPtr->overrideValue;
         units = NULL;   // Get units from resource.
     }
 
@@ -1956,4 +1962,55 @@ double res_QueryStdDev
 //--------------------------------------------------------------------------------------------------
 {
     return obs_QueryStdDev(resPtr, startTime);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Mark an observation as config.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_MarkAsConfig
+(
+    res_Resource_t* resPtr    ///< Ptr to Observation resource.
+)
+//--------------------------------------------------------------------------------------------------
+{
+    resPtr->flags |= RES_FLAG_FROM_CONFIG_FILE;
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Checks whether or not an observation is a config.
+ *
+ * @return:
+ *      - true if observation is a config and flase otherwise.
+ */
+//--------------------------------------------------------------------------------------------------
+bool res_IsConfig
+(
+    res_Resource_t* resPtr    ///< Ptr to Observation resource.
+)
+//--------------------------------------------------------------------------------------------------
+{
+    return (resPtr->flags & RES_FLAG_FROM_CONFIG_FILE);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Function to set the destination string for the specific Observation.
+ *
+ * @return none
+ */
+//--------------------------------------------------------------------------------------------------
+void res_SetDestination
+(
+    res_Resource_t* resPtr,      ///< Ptr to Observation resource
+    const char* destination      ///< Destination string
+)
+//--------------------------------------------------------------------------------------------------
+{
+    obs_SetDestination(resPtr, destination);
 }

@@ -20,6 +20,8 @@
 #define RES_FLAG_JSON_EX_CHANGED    0x04000000  ///< Node JSON example value has been changed since
                                                 ///< the last snapshot (only for JSON resources).
 
+#define RES_FLAG_FROM_CONFIG_FILE   0x02000000  ///< This resource was created by a config file.
+
 // Forward declaration needed by res_Resource_t.entryRef.  See resTree.h
 typedef struct resTree_Entry* resTree_EntryRef_t;
 
@@ -1056,6 +1058,45 @@ double res_QueryStdDev
 (
     res_Resource_t* resPtr,    ///< Ptr to Observation resource.
     double startTime    ///< If < 30 years then seconds before now; else seconds since the Epoch.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Mark an observation as config.
+ */
+//--------------------------------------------------------------------------------------------------
+void res_MarkAsConfig
+(
+    res_Resource_t* resPtr    ///< Ptr to Observation resource.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Checks whether or not an observation is a config.
+ *
+ * @return:
+ *      - true if observation is a config and flase otherwise.
+ */
+//--------------------------------------------------------------------------------------------------
+bool res_IsConfig
+(
+    res_Resource_t* resPtr    ///< Ptr to Observation resource.
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Function to set the destination string for the specific Observation.
+ *
+ * @return none
+ */
+//--------------------------------------------------------------------------------------------------
+void res_SetDestination
+(
+    res_Resource_t* resPtr,      ///< Ptr to Observation resource
+    const char* destination      ///< Destination string
 );
 
 #endif // RESOURCE_H_INCLUDE_GUARD

@@ -11,6 +11,7 @@ provides:
         io.api
         admin.api
         query.api
+        config.api
     }
 }
 
@@ -26,6 +27,7 @@ requires:
     {
         $CURDIR/../json
         $CURDIR/../jsonFormatter
+        $CURDIR/../parser
 #if ${MK_CONFIG_ENABLE_OCTAVE} = y
         $CURDIR/../octaveFormatter
 #endif
@@ -45,12 +47,15 @@ sources:
     resource.c
     resTree.c
     snapshot.c
+    configService.c
+    configService_parse.c
 }
 
 cflags:
 {
     -I$CURDIR/../json
     -I$CURDIR/../jsonFormatter
+    -I$CURDIR/../parser
 #if ${MK_CONFIG_ENABLE_OCTAVE} = y
     -I$CURDIR/../octaveFormatter
     -DWITH_OCTAVE

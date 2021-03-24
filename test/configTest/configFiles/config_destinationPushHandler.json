@@ -1,0 +1,28 @@
+{
+    "t":0,
+    "v":"1.0.0",
+    "ts":1614208658764,
+    "s":{
+    },
+    "o":{
+        "obs1": {
+            "r":"/app/configTest/resource1/value",
+            "d":"destination1"
+        },
+        "obs2": {
+            "r":"/app/configTest/resource2/value",
+            "d":"destination2"
+        },
+        "obs3": {
+            "r":"/app/configTest/resource3/value",
+            "d":"destination3"
+        },
+        "obs4": {
+            "r":"/app/configTest/resource4/value",
+            "d":"destination4",
+            "s":"devs"
+        }
+    },
+    "a":{
+    }
+}

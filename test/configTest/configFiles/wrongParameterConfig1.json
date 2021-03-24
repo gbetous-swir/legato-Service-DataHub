@@ -1,0 +1,17 @@
+{
+    "s":{
+        "/app/cloudInterface/developer_mode/close_on_inactivity":{"v":false},
+        "/app/rpcProxy/developer_mode/enable":{"v":true},
+        "/app/virtual/config":{"v":"{\"rpcProxy\":{\"dt\":3,\"v\":\"dada\"}}","dt":"json"},
+        "/app/orp/asset/out/string2/value":{"v":"Value set from CLOUDS2"},
+        "/app/orp/asset/out/stringd/value":{"v":"skjslkfjsdlfkjslfkjsdlkgd"},
+        "/app/cloudInterface/developer_mode/enable":{"v":true}
+        },
+    "o":{
+        "config_received":
+                {
+                    "r":"/app/cloudInterface/config_received/value",
+                    "d":"/cloudInterfac[e"
+                }
+        }
+}

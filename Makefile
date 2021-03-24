@@ -12,7 +12,7 @@ ifeq ($(O),1)
 endif
 
 .PHONY: all dataHub appInfoStub sensor actuator snapshot
-all: dataHub appInfoStub sensor actuator snapshot
+all: dataHub appInfoStub sensor actuator snapshot configTest
 
 dataHub:
 	mkapp -t $(TARGET) dataHub.adef -i $(LEGATO_ROOT)/interfaces/supervisor $(DBG) ${OCTAVE}
@@ -29,13 +29,16 @@ actuator:
 snapshot:
 	mkapp -t $(TARGET) test/snapshot.adef -i $(PWD) $(DBG) ${OCTAVE}
 
+configTest:
+	mkapp -t $(TARGET) test/configTest.adef -i $(PWD) $(DBG)
+
 .PHONY: clean
 clean:
 	rm -rf _build* *.update docs backup
 
 DHUB = _build_dataHub/$(TARGET)/app/dataHub/staging/read-only/bin/dhub
 
-.PHONY: start stop
+.PHONY: start stop test
 start: stop all
 	# LE_LOG_LEVEL=DEBUG startlegato
 	startlegato
@@ -59,6 +62,16 @@ start: stop all
 stop:
 	stoplegato
 
+
+test: stop all
+	LE_LOG_LEVEL=DEBUG startlegato
+	sdir bind "<$(USER)>.le_appInfo" "<$(USER)>.le_appInfo"
+	sdir bind "<$(USER)>.configTestD.configTest.config" "<$(USER)>.config"
+	sdir bind "<$(USER)>.configTestD.configTest.io" "<$(USER)>.io"
+	sdir bind "<$(USER)>.configTestD.configTest.admin" "<$(USER)>.admin"
+	test/configTest/run_test.sh $(TEST_ARGS)
+
+
 IFGEN_FLAGS = --gen-interface --output-dir _build_docs
 
 .PHONY: docs
@@ -67,4 +80,5 @@ docs:
 	ifgen $(IFGEN_FLAGS) admin.api
 	ifgen $(IFGEN_FLAGS) io.api
 	ifgen $(IFGEN_FLAGS) query.api
+	ifgen $(IFGEN_FLAGS) config.api
 	doxygen

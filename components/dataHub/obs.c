@@ -40,6 +40,7 @@
 #include "resTree.h"
 #include "json.h"
 #include "obs.h"
+#include "configService.h"
 
 #if LE_CONFIG_LINUX
 #   include <ftw.h>
@@ -97,6 +98,7 @@ typedef struct
     le_dls_List_t readOpList; ///< List of ongoing Read Operations on the buffered samples.
 
     char jsonExtraction[ADMIN_MAX_JSON_EXTRACTOR_LEN + 1]; ///< JSON extraction specifier (or "").
+    char destination[CONFIG_MAX_DESTINATION_NAME_BYTES];   ///< Destination name string
 }
 Observation_t;
 
@@ -1462,6 +1464,8 @@ res_Resource_t* obs_Create
 
     obsPtr->jsonExtraction[0] = '\0';
 
+    obsPtr->destination[0] = '\0';
+
     return &obsPtr->resource;
 }
 
@@ -2782,4 +2786,143 @@ double obs_QueryStdDev
     }
 
     return sqrt(sumOfSquaredDifferences / count);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Function to get an Observation's Source path.
+ *
+ * @return
+ *  - LE_OK if successful.
+ *  - LE_BAD_PARAMETER if the path is invalid.
+ *  - LE_NOT_FOUND if the resource doesn't exist or doesn't have a source.
+ *  - LE_OVERFLOW if the path of the source resource won't fit in the string buffer provided.
+ */
+//--------------------------------------------------------------------------------------------------
+static le_result_t obs_GetSource
+(
+    res_Resource_t* resPtr,  ///< [IN] Ptr to Observation resource
+    char* srcPath,           ///< [OUT] Ptr to source path string
+    size_t srcPathSize       ///< [IN] Size of source path string buffer
+)
+//--------------------------------------------------------------------------------------------------
+{
+    resTree_EntryRef_t srcEntry = resTree_GetSource(resPtr->entryRef);
+
+    if (srcEntry == NULL)
+    {
+        return LE_NOT_FOUND;
+    }
+    char resourcePath[HUB_MAX_RESOURCE_PATH_BYTES] = {};
+    le_result_t result = resTree_GetPath(resourcePath, HUB_MAX_RESOURCE_PATH_BYTES,
+        resTree_GetRoot(), srcEntry);
+
+    if (result >= 0)
+    {
+        const char* jsonExtraction = obs_GetJsonExtraction(resPtr);
+
+        // Concatenate the Json Extraction to the end of the source path
+        if (strcmp(jsonExtraction, "") != 0)
+        {
+            snprintf(srcPath, srcPathSize, "%s/%s", resourcePath, jsonExtraction);
+        }
+        else
+        {
+            snprintf(srcPath, srcPathSize, "%s", resourcePath);
+        }
+        return LE_OK;
+    }
+    else if (result == LE_OVERFLOW)
+    {
+        return LE_OVERFLOW;
+    }
+
+    LE_FATAL("Unexpected result %d (%s)", result, LE_RESULT_TXT(result));
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Trigger configService to call destination push handler registered for this observation.
+ *
+ * @return none
+ */
+//--------------------------------------------------------------------------------------------------
+void obs_TriggerDestinationCallback
+(
+    res_Resource_t* resPtr,      ///< Ptr to Observation resource
+    io_DataType_t dataType,      ///< Data type of the data sample
+    dataSample_Ref_t dataSample  ///< Data sample
+)
+//--------------------------------------------------------------------------------------------------
+{
+    le_result_t result;
+    char srcPath[CONFIG_MAX_DESTINATION_SRC_BYTES];
+    Observation_t* obsPtr = CONTAINER_OF(resPtr, Observation_t, resource);
+
+    if (obsPtr == NULL)
+    {
+        LE_ERROR("Unable to retrieve Observation, resPtr [%p]", resPtr);
+        return;
+    }
+
+    // Verify the destination has been configured on the observation
+    if (strlen(obsPtr->destination) == 0)
+    {
+        return;
+    }
+
+    // Get Observation source path
+    result = obs_GetSource(resPtr, srcPath, sizeof(srcPath));
+    if (result != LE_OK)
+    {
+        LE_ERROR("Error retrieving Observation Source path, result [%d]", result);
+        return;
+    }
+
+    LE_DEBUG("[%s] Calling configServices to trigger Destination Push Handler, dataType [%d]",
+             __FUNCTION__,
+             dataType);
+
+    // Trigger the Destination PushHandler
+    result = configService_TriggerDestinationPushHandler(
+                 obsPtr->destination,
+                 resTree_GetEntryName(resPtr->entryRef),
+                 srcPath,
+                 dataType,
+                 dataSample);
+
+    if ((result != LE_OK) &&
+        (result != LE_NOT_FOUND))
+    {
+        LE_ERROR("Error triggering Destination PushHandler, result [%d]", result);
+    }
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Function to set the destination string for the specific Observation.
+ *
+ * @return none
+ */
+//--------------------------------------------------------------------------------------------------
+void obs_SetDestination
+(
+    res_Resource_t* resPtr,      ///< Ptr to Observation resource
+    const char* destination      ///< Destination string
+)
+//--------------------------------------------------------------------------------------------------
+{
+    Observation_t* obsPtr = CONTAINER_OF(resPtr, Observation_t, resource);
+
+    if (obsPtr == NULL)
+    {
+        LE_ERROR("Unable to retrieve Observation, resPtr [%p]", resPtr);
+        return;
+    }
+
+    // Set the desination string
+    strncpy(obsPtr->destination, destination, CONFIG_MAX_DESTINATION_NAME_BYTES);
 }

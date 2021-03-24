@@ -1,0 +1,25 @@
+requires:
+{
+    api:
+    {
+        io.api
+        admin.api
+        config.api
+    }
+}
+
+sources:
+{
+    config_test.c
+    config_load.c
+    config_destinationPushHandler.c
+}
+
+
+bundles:
+{
+    dir:
+    {
+        configFiles   /
+    }
+}

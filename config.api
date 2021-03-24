@@ -1,0 +1,265 @@
+/**
+ * @page c_dataHubConfig Data Hub Config API
+ *
+ * @ref config_interface.h "API Reference"
+ *
+ * @section config_schema Configuration File schema:
+ *
+ * For JSON encoding, the following schema is expected:
+ *
+ * {
+ *    "o":{                                        // observations
+ *        "<observation name>":{                   // name, given to admin_CreateObs
+ *                "r":"<path to be observed>",     // source, given to admin_SetSource
+ *                "d":"<destination>",             // destination, see bellow.
+ *                // Optional Parameters
+ *                "p":<period>,                    // minimum period, given to admin_SetMinPeriod
+ *                "st":<change by>,                // change by, given to admin_SetChangeBy
+ *                "lt":<greater than>,             // high limit, given to admin_SetHighLimit
+ *                "gt":<less than>,                // low limit, given to admin_SetLowLimit
+ *                "b":<buffer length>,             // maximum buffer count,
+ *                                                 // given to admin_SetBufferMaxCount
+ *                "f":"<transform name>"           // transform function,
+ *                                                 // given to admin_SetTransform, see below.
+ *                "s":"<JSON sub-component>"       // json extraction,
+ *                                                 // given to admin_SetJsonExtraction
+ *            },
+ *            ...
+ *    },
+ *    "s":{                                        // state values
+ *        "<resource path>":{                      // absolute path of resource.
+ *                "v":"<value>",                   // value, given to admin_Set<type>Default and
+ *                                                 // admin_Push<type>, where type can be Boolean,
+ *                                                 // Numeric, String or Json.
+ *                "dt":"<data type>"               // Used to differentiate strings from
+ *                                                 // string-encoded JSON
+ *            },
+ *            ...
+ *    },
+ * }
+ *
+ *
+ *
+ * States:
+ * States are values which are pushed to resources and set as default value of those resources.
+ * dataHub will set the value as default using admin_Set*Default functions and then push the value
+ * to the resource using admin_Push* APIs. The resource may not exist at the time that the state is
+ * being parsed in which case the act of setting the default will create a placeholder resource for
+ * it.
+ * Return code of both setting the default and pushing the value will be ignored.
+ *
+ * State Data Type:
+ * The data type of a state is first determined by the type of the JSON value for the "v" key. If
+ * the type is boolean or numeric, then the data type is assumed to be boolean or numeric
+ * respectively. If the type of value is string, then data type is assumed to be string unless the
+ * "dt" : "json" pair is also present in the state.
+ *
+ * Observation Destination:
+ * This is the place where the output of an observation will be directed. It can either be external,
+ * a key only known to client or internal, a path to a resource within dataHub. If destination
+ * string does not begin with "/" , dataHub will consider it external, and if it does, it is assumed
+ * to the path to an internal resource. For internal destinations, dataHub will set the source of
+ * the path as if calling: admin_SetSource("<destination>", "/obs/<observation name>"). For external
+ * strings, dataHub will record the destination string in the observation, to be used later for
+ * calling the DestinationPushHandler.
+ *
+ * Optional Fields in Observation Object:
+ * If an optional property is present, it will be set using the appropriate admin_ API. If an
+ * optional property is absent the behavior depends on whether this observation already existed or
+ * not. If an observation did not exist and is being first created by this configuration file, then
+ * no admin_ API will be called for observation properties that are absent from the observation
+ * object.
+ * If the observation already existed, then a default value will be given to the corresponding
+ * admin_ API for each missing property according to below:
+ *  for minPeriod,changeBy, lowerThan, and greaterThan: NAN
+ *  for bufferMaxCount: 0
+ *  for transform: ADMIN_OBS_TRANSFORM_TYPE_NONE
+ *  for jsonExtraction: '/0'
+ *
+ * Observation Transform Name:
+ * The below table shows the enum value given to admin_SetTransform depending on the transform name:
+@verbatim
+ ┌────────────────┬────────────────────────────────────────┐
+ │Transform String│ value given to  admin_SetTransform     │
+ ├────────────────┼────────────────────────────────────────┤
+ │                │                                        │
+ │     "mean"     │ ADMIN_OBS_TRANSFORM_TYPE_MEAN          │
+ │                │                                        │
+ ├────────────────┼────────────────────────────────────────┤
+ │                │                                        │
+ │    "stddev"    │ ADMIN_OBS_TRANSFORM_TYPE_STDDEV        │
+ │                │                                        │
+ ├────────────────┼────────────────────────────────────────┤
+ │                │                                        │
+ │      "min"     │ ADMIN_OBS_TRANSFORM_TYPE_MIN           │
+ │                │                                        │
+ ├────────────────┼────────────────────────────────────────┤
+ │                │                                        │
+ │      "max"     │ ADMIN_OBS_TRANSFORM_TYPE_MAX           │
+ │                │                                        │
+ ├────────────────┼────────────────────────────────────────┤
+ │                │                                        │
+ │ anything else  │ ADMIN_OBS_TRANSFORM_TYPE_NONE          │
+ │                │                                        │
+ └────────────────┴────────────────────────────────────────┘
+@endverbatim
+ *
+ * Validating the configuration file:
+ * The file is validate for:
+ *
+ *     - Each set of elements are checked for properly formatted JSON
+ *     - Resource paths are checked for proper format and namespace
+ *     - Other options in each element, such as buffer size, period, data type, etc. are checked
+ *     - Observations and state must have all the mandatory fields.
+ *
+ * Note:
+ * String values that hold JSON, like the JSON value for a state, are not validated for valid JSON.
+ *
+ *
+ * Comparing with previously applied configuration files:
+ *
+ * When applying a new configuration file, current set of observations that are created by a
+ * previous configuration file will be compared with observations outlined in the configuration
+ * file. Below is the behavior of dataHub in different circumstances. Observations previously
+ * created by a configuration file are referred to by "config observation" for simplicity.
+ *
+ * If a config observation is absent form the current configuration file, it will be marked for
+ * removal.
+ *
+ * Copyright (C) Sierra Wireless Inc. *
+ * @file config_interface.h
+ */
+//--------------------------------------------------------------------------------------------------
+
+USETYPES io.api;
+USETYPES admin.api;
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * String used to select a supported configuration format
+ */
+//--------------------------------------------------------------------------------------------------
+DEFINE MAX_ENCODED_TYPE_LEN = 15;
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Maximum length of the destination string (excluding null terminator).
+ */
+//--------------------------------------------------------------------------------------------------
+DEFINE MAX_DESTINATION_NAME_LEN = 15;
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Maximum length of the destination string (including null terminator).
+ */
+//--------------------------------------------------------------------------------------------------
+DEFINE MAX_DESTINATION_NAME_BYTES = MAX_DESTINATION_NAME_LEN + 1;
+
+//-------------------------------------------------------------------------------------------------
+/**
+ * Maximum length of source path reported by destination push handler (excluding null terminator).
+ */
+//--------------------------------------------------------------------------------------------------
+DEFINE MAX_DESTINATION_SRC_LEN = io.MAX_RESOURCE_PATH_LEN + admin.MAX_JSON_EXTRACTOR_LEN;
+
+//-------------------------------------------------------------------------------------------------
+/**
+ * Maximum length of source path reported by destination push handler (including null terminator).
+ */
+//--------------------------------------------------------------------------------------------------
+DEFINE MAX_DESTINATION_SRC_BYTES = MAX_DESTINATION_SRC_LEN + 1;
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Maximum length of parser error message string (excluding null terminator).
+ */
+//--------------------------------------------------------------------------------------------------
+DEFINE MAX_ERROR_MSG_LEN = 255;
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Maximum length of parser error message string (including null terminator).
+ */
+//--------------------------------------------------------------------------------------------------
+DEFINE MAX_ERROR_MSG_BYTES = MAX_ERROR_MSG_LEN + 1;
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Handler to pass the result of a configuration load request back to the caller
+ * The result argument may have the following values:
+ * - LE_OK            : Configuration was valid and was successfully applied.
+ * - LE_FORMAT_ERROR  : Configuration is not valid due to a format error.
+ * - LE_BAD_PARAMETER : A parameter in the configuration file is not valid.
+ * - LE_FAULT         : An error has happened during the apply phase. Datahub has deleted all
+ *  resources marked as configuration.
+ */
+//--------------------------------------------------------------------------------------------------
+HANDLER LoadResultHandler
+(
+    le_result_t result IN,                      ///< Result code
+    string errorMsg[MAX_ERROR_MSG_BYTES] IN,    ///< Parse Error Message string
+                                                ///< (NOTE: Only valid when result is not LE_OK)
+    uint32 fileLoc IN                           ///< File location (in bytes) where error occurred
+                                                ///< (NOTE: Only valid when result is not LE_OK)
+                                                ///< Context (implied)
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Causes the Datahub to load a configuration from a file. Any existing configuration will be
+ * removed and replaced with the incoming one
+ *
+ * @note:
+ *  If used over RPC, the filePath parameter must be local to the server.
+ *
+ * @return
+ *  - LE_OK           : Configuration successfully loaded
+ *  - LE_NOT_FOUND    : Unable to locate or retrieve configuration file.
+ *  - LE_UNSUPPORTED  : Configuration encoding format is not supported.
+ */
+//--------------------------------------------------------------------------------------------------
+FUNCTION le_result_t Load
+(
+    string filePath[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path of configuration file.
+    string encodedType[MAX_ENCODED_TYPE_LEN]  IN, ///< Type of encoding used in the file
+    LoadResultHandler callback IN                 ///< Callback to notify caller of result
+                                                  ///< Context (implied)
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+* Callback function for observations in a configuration. The Datahub will call the registered
+* handler when data is received by an observation AND the observation's destination field in the
+* configuration matches the destination string which was passed in AddDestinationPushHandler()
+*
+* @note
+* - If the configuration for an observation is using JSON extraction, then the path which is
+* passed to this handler will include the JSON extraction component. E.g. if the configuration
+* specified an observation on /orp/status/UART1/value with a JSON extraction of "errors", the
+* resulting path would be: /orp/status/UART1/value/errors
+*/
+//--------------------------------------------------------------------------------------------------
+HANDLER DestinationPushHandler
+(
+    double timestamp IN, ///< Seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC)
+    string obsName[io.MAX_RESOURCE_PATH_LEN] IN, ///< Name of observation from configuration
+    string srcPath[MAX_DESTINATION_SRC_LEN] IN, ///< Source path + JSON extraction, if applicable
+    io.DataType dataType IN,  ///< Indicates type of data being returned (Bool, Numeric, or String)
+    bool boolValue IN,  ///< Boolean value
+    double numericValue IN,  ///< Numeric value
+    string stringValue[io.MAX_STRING_VALUE_LEN] IN  ///< String or JSON string value
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/*
+* Causes the AddDestinationPushHandler() and RemoveDestinationPushHandler() functions
+* to be generated by the Legato build tools
+*/
+//--------------------------------------------------------------------------------------------------
+EVENT DestinationPush
+(
+    string destination[MAX_DESTINATION_NAME_BYTES] IN, ///< Destination for this event(e.g. "store")
+    DestinationPushHandler callback                    ///< Destination Push Handler
+);

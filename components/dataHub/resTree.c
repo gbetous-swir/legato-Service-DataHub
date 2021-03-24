@@ -2396,3 +2396,76 @@ double resTree_QueryStdDev
     LE_ASSERT(obsEntry->u.resourcePtr != NULL);
     return res_QueryStdDev(obsEntry->u.resourcePtr, startTime);
 }
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ *  Mark an observation as config.
+ */
+//--------------------------------------------------------------------------------------------------
+void resTree_MarkObservationAsConfig
+(
+    resTree_EntryRef_t obsEntry    ///< Observation entry.
+)
+//--------------------------------------------------------------------------------------------------
+{
+    if (obsEntry->type != ADMIN_ENTRY_TYPE_OBSERVATION)
+    {
+        LE_CRIT("Not an observation (actually a %s).", hub_GetEntryTypeName(obsEntry->type));
+    }
+    else
+    {
+        LE_ASSERT(obsEntry->u.resourcePtr != NULL);
+        res_MarkAsConfig(obsEntry->u.resourcePtr);
+    }
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ *  Is an observation entry a config?
+ *
+ *  @return
+ *      - true if observation is config and false otherwise.
+ */
+//--------------------------------------------------------------------------------------------------
+bool resTree_IsObservationConfig
+(
+    resTree_EntryRef_t obsEntry    ///< Observation entry.
+)
+//--------------------------------------------------------------------------------------------------
+{
+    if (obsEntry->type != ADMIN_ENTRY_TYPE_OBSERVATION)
+    {
+        LE_CRIT("Not an observation (actually a %s).", hub_GetEntryTypeName(obsEntry->type));
+        return false;
+    }
+    else
+    {
+        LE_ASSERT(obsEntry->u.resourcePtr != NULL);
+        return res_IsConfig(obsEntry->u.resourcePtr);
+    }
+}
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Function to set the destination string for the specific Observation.
+ *
+ * @return none
+ */
+//--------------------------------------------------------------------------------------------------
+void resTree_SetDestination
+(
+    resTree_EntryRef_t obsEntry,  ///< Observation entry
+    const char* destination       ///< Destination string
+)
+{
+    if (obsEntry->type != ADMIN_ENTRY_TYPE_OBSERVATION)
+    {
+        return;
+    }
+
+    LE_ASSERT(obsEntry->u.resourcePtr != NULL);
+    res_SetDestination(obsEntry->u.resourcePtr, destination);
+}

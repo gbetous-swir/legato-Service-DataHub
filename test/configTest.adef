@@ -1,0 +1,23 @@
+executables:
+{
+    configTestD = ( configTest )
+}
+
+processes:
+{
+    run:
+    {
+        ( configTestD )
+    }
+
+#if ${LE_CONFIG_RTOS} = y
+    maxStackBytes: 5192
+#endif
+}
+
+bindings:
+{
+    configTestD.configTest.config -> dataHub.config
+    configTestD.configTest.io -> dataHub.io
+    configTestD.configTest.admin -> dataHub.admin
+}

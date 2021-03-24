@@ -576,49 +576,6 @@ dataSample_Ref_t dataSample_ExtractJson
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Create a copy of a Data Sample.
- *
- * @return Pointer to the new copy or NULL if failed to allocate memory for the copy.
- */
-//--------------------------------------------------------------------------------------------------
-dataSample_Ref_t dataSample_Copy
-(
-    io_DataType_t dataType,
-    dataSample_Ref_t original
-)
-//--------------------------------------------------------------------------------------------------
-{
-    dataSample_Ref_t duplicate;
-
-    if ((dataType == IO_DATA_TYPE_STRING) || (dataType == IO_DATA_TYPE_JSON))
-    {
-        duplicate = le_mem_Alloc(StringBasedDataSamplePool);
-        if (duplicate)
-        {
-            *duplicate = *original;
-            duplicate->value.stringPtr = le_mem_StrDup(StringPool, original->value.stringPtr);
-            if (!duplicate->value.stringPtr)
-            {
-                le_mem_Release(duplicate);
-                duplicate = NULL;
-            }
-        }
-    }
-    else
-    {
-        duplicate = le_mem_Alloc(NonStringDataSamplePool);
-        if (duplicate)
-        {
-            *duplicate = *original;
-        }
-    }
-
-    return duplicate;
-}
-
-
-//--------------------------------------------------------------------------------------------------
-/**
  * Set the timestamp of a Data Sample.
  */
 //--------------------------------------------------------------------------------------------------

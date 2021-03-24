@@ -470,4 +470,32 @@ double obs_QueryStdDev
 );
 
 
+//--------------------------------------------------------------------------------------------------
+/**
+ * Trigger configService to call the destination callback, if registered.
+ *
+ * @return none
+ */
+//--------------------------------------------------------------------------------------------------
+void obs_TriggerDestinationCallback
+(
+    res_Resource_t* resPtr,      ///< Ptr to Observation resource
+    io_DataType_t dataType,      ///< Data type of the data sample
+    dataSample_Ref_t dataSample  ///< Data sample
+);
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Function to set the destination string for the specific Observation.
+ *
+ * @return none
+ */
+//--------------------------------------------------------------------------------------------------
+void obs_SetDestination
+(
+    res_Resource_t* resPtr,      ///< Ptr to Observation resource
+    const char* destination      ///< Destination string
+);
+
 #endif // OBS_H_INCLUDE_GUARD

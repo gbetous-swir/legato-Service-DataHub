@@ -1,0 +1,22 @@
+sources:
+{
+    parser_json.c
+}
+
+
+requires:
+{
+    api:
+    {
+        admin.api   [types-only]
+        io.api      [types-only]
+        query.api   [types-only]
+        config.api  [types-only]
+    }
+}
+
+
+cflags:
+{
+    -I$CURDIR/../dataHub
+}

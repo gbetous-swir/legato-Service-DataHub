@@ -66,7 +66,7 @@ static unsigned int PushHandlerCount;
  *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_PushTrigger
+LE_SHARED le_result_t admin_PushTrigger
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -119,7 +119,7 @@ le_result_t admin_PushTrigger
  *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_PushBoolean
+LE_SHARED le_result_t admin_PushBoolean
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -174,7 +174,7 @@ le_result_t admin_PushBoolean
  *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_PushNumeric
+LE_SHARED le_result_t admin_PushNumeric
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -229,7 +229,7 @@ le_result_t admin_PushNumeric
  *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_PushString
+LE_SHARED le_result_t admin_PushString
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -285,7 +285,7 @@ le_result_t admin_PushString
  *      - LE_FAULT If any other error happened during push.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_PushJson
+LE_SHARED le_result_t admin_PushJson
 (
     const char* path,
         ///< [IN] Absolute resource tree path.
@@ -598,7 +598,7 @@ void admin_RemoveJsonPushHandler
  *  - LE_NO_MEMORY if there was a failure in memory allocation.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_SetSource
+LE_SHARED le_result_t admin_SetSource
 (
     const char* destPath,
         ///< [IN] Absolute path of destination resource.
@@ -801,7 +801,7 @@ static resTree_EntryRef_t FindObservation
  *  - LE_FAULT If failed to create observation.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_CreateObs
+LE_SHARED le_result_t admin_CreateObs
 (
     const char* path
         ///< [IN] Path within the /obs/ namespace.
@@ -855,7 +855,7 @@ void admin_DeleteObs
  *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_SetMinPeriod
+LE_SHARED le_result_t admin_SetMinPeriod
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -917,7 +917,7 @@ double admin_GetMinPeriod
  *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_SetHighLimit
+LE_SHARED le_result_t admin_SetHighLimit
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -979,7 +979,7 @@ double admin_GetHighLimit
  *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_SetLowLimit
+LE_SHARED le_result_t admin_SetLowLimit
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -1044,7 +1044,7 @@ double admin_GetLowLimit
  *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_SetChangeBy
+LE_SHARED le_result_t admin_SetChangeBy
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -1177,7 +1177,7 @@ admin_TransformType_t admin_GetTransform
  *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_SetJsonExtraction
+LE_SHARED le_result_t admin_SetJsonExtraction
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.
@@ -1253,7 +1253,7 @@ le_result_t admin_GetJsonExtraction
  *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-le_result_t admin_SetBufferMaxCount
+LE_SHARED le_result_t admin_SetBufferMaxCount
 (
     const char* path,
         ///< [IN] Path within the /obs/ namespace.

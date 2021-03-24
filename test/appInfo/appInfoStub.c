@@ -3,11 +3,13 @@
 
 static int SensorPid = 0;
 static int ActuatorPid = 0;
+static int ConfigTestPid = 0;
 
 COMPONENT_INIT
 {
     le_arg_SetIntVar(&SensorPid, "s", "sensor");
     le_arg_SetIntVar(&ActuatorPid, "a", "actuator");
+    le_arg_SetIntVar(&ConfigTestPid, "c", "configTest");
     le_arg_Scan();
 
     LE_INFO("Starting le_appInfo API stub server.");
@@ -88,6 +90,12 @@ le_result_t le_appInfo_GetName
     {
         LE_DEBUG("Was asked for the name of the actuator process.");
         return le_utf8_Copy(appName, "actuator", appNameNumElements, NULL);
+    }
+
+    if (pid == ConfigTestPid)
+    {
+        LE_DEBUG("Was asked for the name of the configTest process.");
+        return le_utf8_Copy(appName, "configTest", appNameNumElements, NULL);
     }
 
     LE_ERROR("Was asked for the name of app running unknown process with PID %d.", pid);

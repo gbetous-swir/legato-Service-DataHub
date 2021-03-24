@@ -107,7 +107,7 @@ void* hub_MemAlloc
  *  Is resource Path malformed?
  */
 //--------------------------------------------------------------------------------------------------
-bool hub_IsResourcePathMalformed
+LE_SHARED bool hub_IsResourcePathMalformed
 (
     const char* path
 );
