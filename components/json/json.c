@@ -913,8 +913,8 @@ LE_SHARED const char* json_GetDataTypeName
     return "unknown";
 }
 
-
+#ifndef UNIT_TEST
 COMPONENT_INIT
 {
 }
-
+#endif

@@ -1,4 +1,14 @@
 
+
+/*
+ * ====================== WARNING ======================
+ *
+ * THE CONTENTS OF THIS FILE HAVE BEEN AUTO-GENERATED.
+ * DO NOT MODIFY IN ANY WAY.
+ *
+ * ====================== WARNING ======================
+ */
+
 /**
  * @page c_dataHubAdmin Data Hub Admin API
  *
@@ -12,7 +22,6 @@
  *  - Setting and clearing overrides on resources
  *  - Setting the default values of resources
  *  - Pushing values to resources anywhere in the resource tree
- *  - Creating Input and Output resources
  *
  *
  * @section c_dataHubAdmin_ResTree The Resource Tree
@@ -30,9 +39,10 @@
  *  - Observation - filters and/or buffers data
  *  - Placeholder - a placeholder for a yet to be created resource
  *
- * Inputs and Outputs can be created by external apps using the @ref c_dataHubIo, or directly with
- * the @ref c_dataHubAdmin. The Inputs and Outputs created by a given app "x" reside under a
- * namespace "/app/x" that is reserved for that app
+ * Inputs and Outputs are created by external apps using the @ref c_dataHubIo.  The Inputs and
+ * Outputs created by a given app "x" reside under a namespace "/app/x" that is reserved for that
+ * app.  See @ref c_dataHubIo for more information on the structure of these parts of the
+ * resource tree.
  *
  * Observations are created via the Admin API (this API; see below).
  *
@@ -485,188 +495,102 @@
  * there is no support built into this API for coordination between multiple clients.
  *
  *
- * @section c_dataHubAdmin_Resources I/O Resources
- *
- * Clients create Admin "resources" within the Data Hub's resource tree.  Time-stamped
- * data is "pushed" into the Data Hub via "Input" resources and can be received as output from
- * the Data Hub via "Output" resources.
- *
- * Configuration of the routing, filtering, and buffering of this data inside the Data Hub is
- * the responsibility of an "administrator" app, using the @ref c_dataHubAdmin.  Clients of the
- * Admin API don't care about where the data is routed and how it is processed.  They just create
- * their Input and Output resources and send and receive data through those.  This de-couples
- * the I/O apps from the rest of the system, allowing them to be reused in different ways within
- * different systems.
- *
- * Input resources (for pushing input to the Data Hub) are created using admin_CreateInput().
- *
- * Output resources (for receiving output from the Data Hub) are created using admin_CreateOutput().
- *
- * Both Input and Output resources can be deleted using admin_DeleteResource().
- *
- * @note A resource that has been deleted by the Admin API client app may still appear in the
- *       resource tree if the administrator has applied any settings to that resource. The
- *       resource will only disappear from the resource tree when all administrative settings have
- *       been removed *and* the app that created the resource has either deleted the resource or
- *       disconnected from the Data Hub.
- *
- * Each I/O resource has the following attributes:
- * - Path
- * - Data type
- * - Units
- *
- * @code
- *
- * le_result_t result = admin_CreateInput("temperature/value", IO_DATA_TYPE_NUMERIC, "degC");
- *
- * @endcode
- *
- *
- * @section c_dataHubAdmin_Paths Paths
- *
- * The path of a resource is its unique identifier within the Data Hub's resource tree.
- *
- * Admin API allows to create any I/O resource within any namespace.
- *
- * Path has to be absolute, eg. "/app/tempSensor/temperature/value".
- *
- * An important set of conventions exist for structuring I/O resource paths:
- * - A sensor's main input resource must be called "value".
- * - An actuator's main output resource must be called "enable".
- * - The name of the "value" or "enable" resource's parent is the name of the sensor or actuator.
- * - All output resources under the same parent as a "value" or "enable" resource are for related
- *   settings.
- *
- * Furthermore, some conventions exist for settings related to sensors:
- * - If a sensor has a boolean output resource called "enable" next to (under the same parent as)
- *   its "value" resource, that "enable" resource can be used by administrator apps to disable the
- *   sensor (by setting that output to "false").
- * - If a boolean output resource called "period" appears next to a "value" input resource
- *   then it can be used to tell the sensor to perform periodic sampling.
- * - If a trigger output resource called "trigger" appears next to a "value" input resource
- *   then it can be used to tell the sensor to push a single sample to its "value" input.
- *
- * For example,
- *
- * @verbatim
-/app
-  |
-  +--/airSensor
-  |   |
-  |   +--/temperature
-  |   |   |
-  |   |   +--/value = the temperature sensor input
-  |   |   |
-  |   |   +--/period = an output used to configure the temperature sensor's sampling period
-  |   |   |
-  |   |   +--/trigger = an output used to immediately trigger a single temperature sensor sample
-  |   |   |
-  |   |   +--/enable = an output used to enable or disable the temperature sensor
-  |   |
-  |   +--/humidity
-  |       |
-  |       +--/value = the humidity sensor input
-  |       |
-  |       +--/period = an output used to configure the humidity sensor's sampling period
-  |       |
-  |       +--/enable = an output used to enable or disable the humidity sensor
-  |
-  +--/lowBattery
-  |   |
-  |   +--/value = the lowBattery sensor input
-  |   |
-  |   +--/level = output used to configure the level at which the low battery alarm will trigger
-  |
-  +--/hvac
-      |
-      +--/temperature = the HVAC system's temperature setpoint output
-      |
-      +--/enable = an output used to enable or disable the HVAC system
-      |
-      +--/fanOn = an output used to control the fan mode (auto or always on)
-      |
-      +--/coolOff = an output used to control the cooling mode (auto or disabled)
-      |
-      +--/heatOff = an output used to control the heating mode (auto or disabled)
- * @endverbatim
- *
- * @note The @c enable output can be used to coordinate atomic updates to multiple output
- * resources for the same sensor or actuator.  For example, if an analog-to-digital converter (ADC)
- * accepts settings @c adc/min and @c adc/max to configure the scaling of the ADC reading into
- * physical units like "degC" or "%RH", the sensor may produce garbage readings between the time
- * that @c adc/min and @c adc/max are updated.  The sensor can then also provide @c adc/enable,
- * which the admin tool can use to disable the ADC while it is updating @c adc/min and @c adc/max.
- *
- * Paths are not permitted to contain '.', '[', or ']' characters, as those are reserved for
- * specifying members of structured JSON data samples in the @ref c_dataHubAdmin "Admin" and
- * @ref c_dataHubQuery "Query" APIs.
- *
- *
- * @section c_dataHubAdmin_DataTypes Data Types
- *
- * Data types supported are:
- * - trigger = used to indicate an event that doesn't have any associated value.
- * - Boolean = a Boolean (true or false) value
- * - numeric = a double-precision floating point value.
- * - string = a UTF-8 string value
- * - JSON = a string in JSON format
- *
- * JSON and string Inputs and Outputs can receive any type of data, but other types of
- * Input or Output can only receive one type of data.  E.g., a Boolean sample cannot
- * be pushed to a trigger or numeric resource, and a string cannot be pushed to a Boolean, trigger,
- * or numeric resource.
- *
- * Furthermore, JSON and string type push hander call-back functions can be registered on other
- * types of Outputs, and a type conversion will happen automatically when the data sample is
- * delivered to its consumer.  For example, if io_AddJsonPushHandler() is used to register a JSON
- * Push Handler call-back on a numeric Output, whenever a numeric data sample arrives at that
- * Output, the JSON push handler will be called with a string parameter containing the JSON
- * representation of that numeric sample's value.
- *
- * @subsection c_dataHubAdmin_DataTypes_JsonExamples JSON Examples
- *
- * When a JSON Input is created, admin_SetJsonExample() can be called to provide an example of what a
- * value should look like.  This can be retrieved by the administrative app via a call to
- * admin_GetJsonExample(), and allows the administrator to see (via an HMI of some kind) what a
- * value might look like before the sensor is enabled.  This assists in the configuration of
- * @ref c_dataHubAdmin_JsonExtraction "JSON extraction" before going live with data collection.
- *
- * @code
- *
- * admin_SetJsonExample("accel/value", "{\"x\": 0, \"y\": 0, \"z\": 0}");
- *
- * @endcode
- *
- *
- * @section c_dataHubAdmin_Units Units
- *
- * Scalar data values have units, such as degrees Celcius, Pascals, Hertz, etc.  Defects can arise
- * if the sender and receiver of a data sample disagree on their units.  For example,
- * https://en.wikipedia.org/wiki/Mars_Climate_Orbiter.
- *
- * When a numeric type I/O resource is created, it can have a string describing its units.
- * If two resources do not agree on their units, data samples will not be routed between them.
- *
- * See the senml RFC draft for a list of units strings in section 12.1 Units Registry at
- * https://tools.ietf.org/html/draft-ietf-core-senml-12#page-26.
- *
- *
  * Copyright (C) Sierra Wireless Inc.
  *
  * @file admin_interface.h
  */
+
+#ifndef ADMIN_INTERFACE_H_INCLUDE_GUARD
+#define ADMIN_INTERFACE_H_INCLUDE_GUARD
+
+
+#include "legato.h"
+
+// Interface specific includes
+#include "io_interface.h"
+
+// Internal includes for this interface
+#include "admin_common.h"
 //--------------------------------------------------------------------------------------------------
-
-
-USETYPES io.api;
-
+/**
+ * Type for handler called when a server disconnects.
+ */
+//--------------------------------------------------------------------------------------------------
+typedef void (*admin_DisconnectHandler_t)(void *);
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Maximum number of characters in a JSON extraction specifier string (excluding null terminator).
+ *
+ * Connect the current client thread to the service providing this API. Block until the service is
+ * available.
+ *
+ * For each thread that wants to use this API, either ConnectService or TryConnectService must be
+ * called before any other functions in this API.  Normally, ConnectService is automatically called
+ * for the main thread, but not for any other thread. For details, see @ref apiFilesC_client.
+ *
+ * This function is created automatically.
  */
 //--------------------------------------------------------------------------------------------------
-DEFINE MAX_JSON_EXTRACTOR_LEN = 63;
+void admin_ConnectService
+(
+    void
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ *
+ * Try to connect the current client thread to the service providing this API. Return with an error
+ * if the service is not available.
+ *
+ * For each thread that wants to use this API, either ConnectService or TryConnectService must be
+ * called before any other functions in this API.  Normally, ConnectService is automatically called
+ * for the main thread, but not for any other thread. For details, see @ref apiFilesC_client.
+ *
+ * This function is created automatically.
+ *
+ * @return
+ *  - LE_OK if the client connected successfully to the service.
+ *  - LE_UNAVAILABLE if the server is not currently offering the service to which the client is
+ *    bound.
+ *  - LE_NOT_PERMITTED if the client interface is not bound to any service (doesn't have a binding).
+ *  - LE_COMM_ERROR if the Service Directory cannot be reached.
+ */
+//--------------------------------------------------------------------------------------------------
+le_result_t admin_TryConnectService
+(
+    void
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Set handler called when server disconnection is detected.
+ *
+ * When a server connection is lost, call this handler then exit with LE_FATAL.  If a program wants
+ * to continue without exiting, it should call longjmp() from inside the handler.
+ */
+//--------------------------------------------------------------------------------------------------
+LE_FULL_API void admin_SetServerDisconnectHandler
+(
+    admin_DisconnectHandler_t disconnectHandler,
+    void *contextPtr
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ *
+ * Disconnect the current client thread from the service providing this API.
+ *
+ * Normally, this function doesn't need to be called. After this function is called, there's no
+ * longer a connection to the service, and the functions in this API can't be used. For details, see
+ * @ref apiFilesC_client.
+ *
+ * This function is created automatically.
+ */
+//--------------------------------------------------------------------------------------------------
+void admin_DisconnectService
+(
+    void
+);
 
 
 //--------------------------------------------------------------------------------------------------
@@ -674,15 +598,6 @@ DEFINE MAX_JSON_EXTRACTOR_LEN = 63;
  * Enumerates the different types of entries that can exist in the resource tree.
  */
 //--------------------------------------------------------------------------------------------------
-ENUM EntryType
-{
-    ENTRY_TYPE_NONE,        ///< Not an entry
-    ENTRY_TYPE_NAMESPACE,   ///< Namespace
-    ENTRY_TYPE_INPUT,       ///< Input
-    ENTRY_TYPE_OUTPUT,      ///< Output
-    ENTRY_TYPE_OBSERVATION, ///< Observation
-    ENTRY_TYPE_PLACEHOLDER  ///< Placeholder
-};
 
 
 //--------------------------------------------------------------------------------------------------
@@ -690,19 +605,6 @@ ENUM EntryType
  * Enumerates the different operations on a Resource - add and remove.
  */
 //--------------------------------------------------------------------------------------------------
-ENUM ResourceOperationType
-{
-    RESOURCE_ADDED,     //< Added
-    RESOURCE_REMOVED    //< Removed
-};
-
-
-//--------------------------------------------------------------------------------------------------
-/**
- * Maximum number of optional transform parameters for an observation buffer.
- */
-//--------------------------------------------------------------------------------------------------
-DEFINE MAX_TRANSFORM_PARAMETERS = 8;
 
 
 //--------------------------------------------------------------------------------------------------
@@ -710,14 +612,91 @@ DEFINE MAX_TRANSFORM_PARAMETERS = 8;
  * Enumerates the different types of transforms which can be applied to an observation buffer
  */
 //--------------------------------------------------------------------------------------------------
-ENUM TransformType
-{
-    OBS_TRANSFORM_TYPE_NONE,      ///< No transformation
-    OBS_TRANSFORM_TYPE_MEAN,      ///< Mean
-    OBS_TRANSFORM_TYPE_STDDEV,    ///< Standard Deviation
-    OBS_TRANSFORM_TYPE_MAX,       ///< Maximum value in buffer
-    OBS_TRANSFORM_TYPE_MIN,       ///< Minimum value in buffer
-};
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Callback function for pushing triggers to an output
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Reference type used by Add/Remove functions for EVENT 'admin_TriggerPush'
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Callback function for pushing Boolean values to an output
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Reference type used by Add/Remove functions for EVENT 'admin_BooleanPush'
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Callback function for pushing numeric values to an output
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Reference type used by Add/Remove functions for EVENT 'admin_NumericPush'
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Callback function for pushing string values to an output
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Reference type used by Add/Remove functions for EVENT 'admin_StringPush'
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Callback function for pushing JSON values to an output
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Reference type used by Add/Remove functions for EVENT 'admin_JsonPush'
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Register a handler, to be called back whenever a Resource is added or removed
+ */
+//--------------------------------------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Reference type used by Add/Remove functions for EVENT 'admin_ResourceTreeChange'
+ */
+//--------------------------------------------------------------------------------------------------
+
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -729,16 +708,17 @@ ENUM TransformType
  *  - LE_OK if successful.
  *  - LE_DUPLICATE if a resource by that name exists but with different direction, type or units.
  *  - LE_NO_MEMORY if the client is not permitted to create that many resources.
- *  - LE_FAULT if the path is not absolute.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t CreateInput
+le_result_t admin_CreateInput
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
-    io.DataType dataType IN, ///< The data type.
-    string units[io.MAX_UNITS_NAME_LEN] IN ///< e.g., "degC" (see senml); "" = unspecified.
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute resource tree path.
+    io_DataType_t dataType,
+        ///< [IN] The data type.
+    const char* LE_NONNULL units
+        ///< [IN] e.g., "degC" (see senml); "" = unspecified.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -747,12 +727,13 @@ FUNCTION le_result_t CreateInput
  * Does nothing if the resource is not found, is not an input, or doesn't have a JSON type.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION SetJsonExample
+void admin_SetJsonExample
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
-    string example[io.MAX_STRING_VALUE_LEN] IN ///< The example JSON value string.
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute resource tree path.
+    const char* LE_NONNULL example
+        ///< [IN] The example JSON value string.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -764,16 +745,17 @@ FUNCTION SetJsonExample
  *  - LE_OK if successful.
  *  - LE_DUPLICATE if a resource by that name exists but with different direction, type or units.
  *  - LE_NO_MEMORY if the client is not permitted to create that many resources.
- *  - LE_FAULT if the path is not absolute.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t CreateOutput
+le_result_t admin_CreateOutput
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
-    io.DataType dataType IN, ///< The data type.
-    string units[io.MAX_UNITS_NAME_LEN] IN ///< e.g., "degC" (see senml); "" = unspecified.
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute resource tree path.
+    io_DataType_t dataType,
+        ///< [IN] The data type.
+    const char* LE_NONNULL units
+        ///< [IN] e.g., "degC" (see senml); "" = unspecified.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -782,9 +764,10 @@ FUNCTION le_result_t CreateOutput
  * Does nothing if the resource doesn't exist.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION DeleteResource
+void admin_DeleteResource
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN ///< Absolute resource tree path.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute resource tree path.
 );
 
 //--------------------------------------------------------------------------------------------------
@@ -792,265 +775,234 @@ FUNCTION DeleteResource
  * Mark an Output resource "optional".  (By default, they are marked "mandatory".)
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION MarkOptional
+void admin_MarkOptional
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN ///< Absolute resource tree path.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute resource tree path.
 );
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a trigger type data sample to a resource.
  *
- * @note The LE_OK return from this function means the sample has been successfully received by
- * datahub. It does not guarantee that the sample will be successfully processed by observers
- * of the path or that the sample will not be lost after power cycle.
- *
- * @return
- *      - LE_OK If datasample was pushed successfully.
- *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
- *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
- *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
- *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
- *          created.
- *      - LE_FAULT If any other error happened during push.
+ * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
+ *       Placeholder resource to be created.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t PushTrigger
+void admin_PushTrigger
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
-    double timestamp IN ///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
-                        ///< Zero = now (i.e., generate a timestamp for me).
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute resource tree path.
+    double timestamp
+        ///< [IN] Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
+        ///< Zero = now (i.e., generate a timestamp for me).
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a Boolean type data sample to a resource.
  *
- * @note The LE_OK return from this function means the sample has been successfully received by
- * datahub. It does not guarantee that the sample will be successfully processed by observers
- * of the path or that the sample will not be lost after power cycle.
- *
- * @return
- *      - LE_OK If datasample was pushed successfully.
- *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
- *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
- *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
- *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
- *          created.
- *      - LE_FAULT If any other error happened during push.
+ * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
+ *       Placeholder resource to be created.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t PushBoolean
+void admin_PushBoolean
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
-    double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
-                        ///< Zero = now (i.e., generate a timestamp for me).
-    bool value IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute resource tree path.
+    double timestamp,
+        ///< [IN] Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
+        ///< Zero = now (i.e., generate a timestamp for me).
+    bool value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a numeric type data sample to a resource.
  *
- * @note The LE_OK return from this function means the sample has been successfully received by
- * datahub. It does not guarantee that the sample will be successfully processed by observers
- * of the path or that the sample will not be lost after power cycle.
- *
- * @return
- *      - LE_OK If datasample was pushed successfully.
- *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
- *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
- *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
- *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
- *          created.
- *      - LE_FAULT If any other error happened during push.
+ * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
+ *       Placeholder resource to be created.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t PushNumeric
+void admin_PushNumeric
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
-    double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
-                        ///< Zero = now (i.e., generate a timestamp for me).
-    double value IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute resource tree path.
+    double timestamp,
+        ///< [IN] Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
+        ///< Zero = now (i.e., generate a timestamp for me).
+    double value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a string type data sample to a resource.
  *
- * @note The LE_OK return from this function means the sample has been successfully received by
- * datahub. It does not guarantee that the sample will be successfully processed by observers
- * of the path or that the sample will not be lost after power cycle.
- *
- * @return
- *      - LE_OK If datasample was pushed successfully.
- *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
- *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
- *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit.
- *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
- *          created.
- *      - LE_FAULT If any other error happened during push.
+ * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
+ *       Placeholder resource to be created.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t PushString
+void admin_PushString
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
-    double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
-                        ///< Zero = now (i.e., generate a timestamp for me).
-    string value[io.MAX_STRING_VALUE_LEN] IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute resource tree path.
+    double timestamp,
+        ///< [IN] Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
+        ///< Zero = now (i.e., generate a timestamp for me).
+    const char* LE_NONNULL value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Push a JSON data sample to a resource.
  *
- * @note The LE_OK return from this function means the sample has been successfully received by
- * datahub. It does not guarantee that the sample will be successfully processed by observers
- * of the path or that the sample will not be lost after power cycle.
- *
- * @return
- *      - LE_OK If datasample was pushed successfully.
- *      - LE_NO_MEMORY If failed to push the data sample because of failure in memory allocation.
- *      - LE_IN_PROGRESS Push is rejected because a configuration update is in progress.
- *      - LE_BAD_PARAMETER If there is a mismatch of datasample unit or JSON is invalid.
- *      - LE_NOT_FOUND If the path does not exist. This will not cause a Placeholder resource to be
- *          created.
- *      - LE_FAULT If any other error happened during push.
+ * @note If the resource doesn't exist, the push will be ignored.  This will not cause a
+ *       Placeholder resource to be created.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t PushJson
+void admin_PushJson
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute resource tree path.
-    double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
-                        ///< Zero = now (i.e., generate a timestamp for me).
-    string value[io.MAX_STRING_VALUE_LEN] IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute resource tree path.
+    double timestamp,
+        ///< [IN] Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
+        ///< Zero = now (i.e., generate a timestamp for me).
+    const char* LE_NONNULL value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Callback function for pushing triggers to an output
+ * Add handler function for EVENT 'admin_TriggerPush'
  */
 //--------------------------------------------------------------------------------------------------
-HANDLER TriggerPushHandler
+admin_TriggerPushHandlerRef_t admin_AddTriggerPushHandler
 (
-    double timestamp IN ///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of resource.
+    admin_TriggerPushHandlerFunc_t callbackPtr,
+        ///< [IN]
+    void* contextPtr
+        ///< [IN]
 );
-
-
-//--------------------------------------------------------------------------------------------------
-/*
- * Causes the AddTriggerPushHandler() and RemoveTriggerPushHandler() functions
- * to be generated by the Legato build tools.
- */
-//--------------------------------------------------------------------------------------------------
-EVENT TriggerPush
-(
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute path of resource.
-    TriggerPushHandler callback
-);
-
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Callback function for pushing Boolean values to an output
+ * Remove handler function for EVENT 'admin_TriggerPush'
  */
 //--------------------------------------------------------------------------------------------------
-HANDLER BooleanPushHandler
+void admin_RemoveTriggerPushHandler
 (
-    double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
-    bool value IN
+    admin_TriggerPushHandlerRef_t handlerRef
+        ///< [IN]
 );
-
-
-//--------------------------------------------------------------------------------------------------
-/*
- * Causes the AddBooleanPushHandler() and RemoveBooleanPushHandler() functions
- * to be generated by the Legato build tools.
- */
-//--------------------------------------------------------------------------------------------------
-EVENT BooleanPush
-(
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute path of resource.
-    BooleanPushHandler callback
-);
-
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Callback function for pushing numeric values to an output
+ * Add handler function for EVENT 'admin_BooleanPush'
  */
 //--------------------------------------------------------------------------------------------------
-HANDLER NumericPushHandler
+admin_BooleanPushHandlerRef_t admin_AddBooleanPushHandler
 (
-    double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
-    double value IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of resource.
+    admin_BooleanPushHandlerFunc_t callbackPtr,
+        ///< [IN]
+    void* contextPtr
+        ///< [IN]
 );
-
-//--------------------------------------------------------------------------------------------------
-/*
- * Causes the AddNumericPushHandler() and RemoveNumericPushHandler() functions
- * to be generated by the Legato build tools.
- */
-//--------------------------------------------------------------------------------------------------
-EVENT NumericPush
-(
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute path of resource.
-    NumericPushHandler callback
-);
-
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Callback function for pushing string values to an output
+ * Remove handler function for EVENT 'admin_BooleanPush'
  */
 //--------------------------------------------------------------------------------------------------
-HANDLER StringPushHandler
+void admin_RemoveBooleanPushHandler
 (
-    double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
-    string value[io.MAX_STRING_VALUE_LEN] IN
+    admin_BooleanPushHandlerRef_t handlerRef
+        ///< [IN]
 );
-
-//--------------------------------------------------------------------------------------------------
-/*
- * Causes the AddStringPushHandler() and RemoveStringPushHandler() functions
- * to be generated by the Legato build tools.
- */
-//--------------------------------------------------------------------------------------------------
-EVENT StringPush
-(
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute path of resource.
-    StringPushHandler callback
-);
-
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Callback function for pushing JSON values to an output
+ * Add handler function for EVENT 'admin_NumericPush'
  */
 //--------------------------------------------------------------------------------------------------
-HANDLER JsonPushHandler
+admin_NumericPushHandlerRef_t admin_AddNumericPushHandler
 (
-    double timestamp IN,///< Timestamp in seconds since the Epoch 1970-01-01 00:00:00 +0000 (UTC).
-    string value[io.MAX_STRING_VALUE_LEN] IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of resource.
+    admin_NumericPushHandlerFunc_t callbackPtr,
+        ///< [IN]
+    void* contextPtr
+        ///< [IN]
 );
 
 //--------------------------------------------------------------------------------------------------
-/*
- * Causes the AddJsonPushHandler() and RemoveJsonPushHandler() functions
- * to be generated by the Legato build tools.
+/**
+ * Remove handler function for EVENT 'admin_NumericPush'
  */
 //--------------------------------------------------------------------------------------------------
-EVENT JsonPush
+void admin_RemoveNumericPushHandler
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,///< Absolute path of resource.
-    JsonPushHandler callback
+    admin_NumericPushHandlerRef_t handlerRef
+        ///< [IN]
 );
 
+//--------------------------------------------------------------------------------------------------
+/**
+ * Add handler function for EVENT 'admin_StringPush'
+ */
+//--------------------------------------------------------------------------------------------------
+admin_StringPushHandlerRef_t admin_AddStringPushHandler
+(
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of resource.
+    admin_StringPushHandlerFunc_t callbackPtr,
+        ///< [IN]
+    void* contextPtr
+        ///< [IN]
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Remove handler function for EVENT 'admin_StringPush'
+ */
+//--------------------------------------------------------------------------------------------------
+void admin_RemoveStringPushHandler
+(
+    admin_StringPushHandlerRef_t handlerRef
+        ///< [IN]
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Add handler function for EVENT 'admin_JsonPush'
+ */
+//--------------------------------------------------------------------------------------------------
+admin_JsonPushHandlerRef_t admin_AddJsonPushHandler
+(
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of resource.
+    admin_JsonPushHandlerFunc_t callbackPtr,
+        ///< [IN]
+    void* contextPtr
+        ///< [IN]
+);
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Remove handler function for EVENT 'admin_JsonPush'
+ */
+//--------------------------------------------------------------------------------------------------
+void admin_RemoveJsonPushHandler
+(
+    admin_JsonPushHandlerRef_t handlerRef
+        ///< [IN]
+);
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1070,15 +1022,15 @@ EVENT JsonPush
  *  - LE_OK if route already existed or new route was successfully created.
  *  - LE_BAD_PARAMETER if one of the paths is invalid.
  *  - LE_DUPLICATE if the addition of this route would result in a loop.
- *  - LE_NO_MEMORY if there was a failure in memory allocation.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetSource
+le_result_t admin_SetSource
 (
-    string destPath[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of destination resource.
-    string srcPath[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of source resource.
+    const char* LE_NONNULL destPath,
+        ///< [IN] Absolute path of destination resource.
+    const char* LE_NONNULL srcPath
+        ///< [IN] Absolute path of source resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1097,23 +1049,26 @@ FUNCTION le_result_t SetSource
  *  - LE_OVERFLOW if the path of the source resource won't fit in the string buffer provided.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t GetSource
+le_result_t admin_GetSource
 (
-    string destPath[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of destination resource.
-    string srcPath[io.MAX_RESOURCE_PATH_LEN] OUT  ///< Absolute path of source resource.
+    const char* LE_NONNULL destPath,
+        ///< [IN] Absolute path of destination resource.
+    char* srcPath,
+        ///< [OUT] Absolute path of source resource.
+    size_t srcPathSize
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Remove the data flow route into a resource.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION RemoveSource
+void admin_RemoveSource
 (
-    string destPath[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of destination resource.
+    const char* LE_NONNULL destPath
+        ///< [IN] Absolute path of destination resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1121,43 +1076,40 @@ FUNCTION RemoveSource
  *
  *  @return
  *  - LE_OK if the observation was created or it already existed.
- *  - LE_FAULT If failed to create observation.
+ *  - LE_BAD_PARAMETER if the path is invalid.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t CreateObs
+le_result_t admin_CreateObs
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Path within the /obs/ namespace.
+    const char* LE_NONNULL path
+        ///< [IN] Path within the /obs/ namespace.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Delete an Observation in the /obs/ namespace.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION DeleteObs
+void admin_DeleteObs
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Path within the /obs/ namespace.
+    const char* LE_NONNULL path
+        ///< [IN] Path within the /obs/ namespace.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the minimum period between data samples accepted by a given Observation.
  *
  * This is used to throttle the rate of data passing into and through an Observation.
- *
- * @return
- *      - LE_OK If minimum period was set successfully.
- *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetMinPeriod
+void admin_SetMinPeriod
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
-    double minPeriod IN ///< The minimum period, in seconds.
+    const char* LE_NONNULL path,
+        ///< [IN] Path within the /obs/ namespace.
+    double minPeriod
+        ///< [IN] The minimum period, in seconds.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1166,29 +1118,26 @@ FUNCTION le_result_t SetMinPeriod
  * @return The value, or NAN (not a number) if not set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION double GetMinPeriod
+double admin_GetMinPeriod
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Path within the /obs/ namespace.
+    const char* LE_NONNULL path
+        ///< [IN] Path within the /obs/ namespace.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the highest value in a range that will be accepted by a given Observation.
  *
  * Ignored for all non-numeric types except Boolean for which non-zero = true and zero = false.
- *
- * @return
- *      - LE_OK If high limit was set successfully.
- *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetHighLimit
+void admin_SetHighLimit
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
-    double highLimit IN ///< The highest value in the range, or NAN (not a number) to remove limit.
+    const char* LE_NONNULL path,
+        ///< [IN] Path within the /obs/ namespace.
+    double highLimit
+        ///< [IN] The highest value in the range, or NAN (not a number) to remove limit.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1197,29 +1146,26 @@ FUNCTION le_result_t SetHighLimit
  * @return The value, or NAN (not a number) if not set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION double GetHighLimit
+double admin_GetHighLimit
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Path within the /obs/ namespace.
+    const char* LE_NONNULL path
+        ///< [IN] Path within the /obs/ namespace.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the lowest value in a range that will be accepted by a given Observation.
  *
  * Ignored for all non-numeric types except Boolean for which non-zero = true and zero = false.
- *
- * @return
- *      - LE_OK If low limit was set successfully.
- *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetLowLimit
+void admin_SetLowLimit
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
-    double lowLimit IN ///< The lowest value in the range, or NAN (not a number) to remove limit.
+    const char* LE_NONNULL path,
+        ///< [IN] Path within the /obs/ namespace.
+    double lowLimit
+        ///< [IN] The lowest value in the range, or NAN (not a number) to remove limit.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1228,11 +1174,11 @@ FUNCTION le_result_t SetLowLimit
  * @return The value, or NAN (not a number) if not set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION double GetLowLimit
+double admin_GetLowLimit
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Path within the /obs/ namespace.
+    const char* LE_NONNULL path
+        ///< [IN] Path within the /obs/ namespace.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1242,18 +1188,15 @@ FUNCTION double GetLowLimit
  * Ignored for trigger types.
  *
  * For all other types, any non-zero value means accept any change, but drop if the same as current.
- *
- * @return
- *      - LE_OK If change by magnitude was set successfully.
- *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetChangeBy
+void admin_SetChangeBy
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
-    double change IN ///< The magnitude, or either zero or NAN (not a number) to remove limit.
+    const char* LE_NONNULL path,
+        ///< [IN] Path within the /obs/ namespace.
+    double change
+        ///< [IN] The magnitude, or either zero or NAN (not a number) to remove limit.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1263,11 +1206,11 @@ FUNCTION le_result_t SetChangeBy
  * @return The value, or NAN (not a number) if not set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION double GetChangeBy
+double admin_GetChangeBy
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Path within the /obs/ namespace.
+    const char* LE_NONNULL path
+        ///< [IN] Path within the /obs/ namespace.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1275,19 +1218,19 @@ FUNCTION double GetChangeBy
  * the output of the transform
  *
  * Ignored for all non-numeric types except Boolean for which non-zero = true and zero = false.
- *
- * @return
- *      - LE_OK If transfrom was done successfully.
- *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetTransform
+void admin_SetTransform
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,   ///< Path within the /obs/ namespace.
-    TransformType transformType IN,             ///< Type of transform to apply
-    double params[MAX_TRANSFORM_PARAMETERS] IN  ///< Optional parameter list
+    const char* LE_NONNULL path,
+        ///< [IN] Path within the /obs/ namespace.
+    admin_TransformType_t transformType,
+        ///< [IN] Type of transform to apply
+    const double* paramsPtr,
+        ///< [IN] Optional parameter list
+    size_t paramsSize
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1296,11 +1239,11 @@ FUNCTION le_result_t SetTransform
  * @return The TransformType
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION TransformType GetTransform
+admin_TransformType_t admin_GetTransform
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN   ///< Path within the /obs/ namespace.
+    const char* LE_NONNULL path
+        ///< [IN] Path within the /obs/ namespace.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1311,18 +1254,15 @@ FUNCTION TransformType GetTransform
  * the specified object member or array element will also be ignored.
  *
  * To clear, set to an empty string.
- *
- * @return
- *      - LE_OK If JSON extraction was set successfully.
- *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetJsonExtraction
+void admin_SetJsonExtraction
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
-    string extractionSpec[MAX_JSON_EXTRACTOR_LEN] IN ///< str specifying member/element to extract.
+    const char* LE_NONNULL path,
+        ///< [IN] Path within the /obs/ namespace.
+    const char* LE_NONNULL extractionSpec
+        ///< [IN] str specifying member/element to extract.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1335,29 +1275,29 @@ FUNCTION le_result_t SetJsonExtraction
  *  - LE_OVERFLOW if the JSON extraction specifier won't fit in the string buffer provided.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t GetJsonExtraction
+le_result_t admin_GetJsonExtraction
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN,  ///< Path within the /obs/ namespace.
-    string result[MAX_JSON_EXTRACTOR_LEN] OUT  ///< Buffer where result goes if LE_OK returned.
+    const char* LE_NONNULL path,
+        ///< [IN] Path within the /obs/ namespace.
+    char* result,
+        ///< [OUT] Buffer where result goes if LE_OK returned.
+    size_t resultSize
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the maximum number of data samples to buffer in a given Observation.  Buffers are FIFO
  * circular buffers. When full, the buffer drops the oldest value to make room for a new addition.
- *
- * @return
- *      - LE_OK If max buffer count was set successfully.
- *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetBufferMaxCount
+void admin_SetBufferMaxCount
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
-    uint32 count IN ///< The number of samples to buffer (0 = remove setting).
+    const char* LE_NONNULL path,
+        ///< [IN] Path within the /obs/ namespace.
+    uint32_t count
+        ///< [IN] The number of samples to buffer (0 = remove setting).
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1366,11 +1306,11 @@ FUNCTION le_result_t SetBufferMaxCount
  * @return The buffer size (in number of samples) or 0 if not set or the Observation does not exist.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION uint32 GetBufferMaxCount
+uint32_t admin_GetBufferMaxCount
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Path within the /obs/ namespace.
+    const char* LE_NONNULL path
+        ///< [IN] Path within the /obs/ namespace.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1378,18 +1318,15 @@ FUNCTION uint32 GetBufferMaxCount
  * If the buffer's size is non-zero and the backup period is non-zero, then the buffer will be
  * backed-up to non-volatile storage when it changes, but never more often than this period setting
  * specifies.
- *
- * @return
- *      - LE_OK If buffer backup period was set successfully.
- *      - LE_FAULT If an error happened during set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetBufferBackupPeriod
+void admin_SetBufferBackupPeriod
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Path within the /obs/ namespace.
-    uint32 seconds IN ///< The minimum number of seconds between backups (0 = disable backups)
+    const char* LE_NONNULL path,
+        ///< [IN] Path within the /obs/ namespace.
+    uint32_t seconds
+        ///< [IN] The minimum number of seconds between backups (0 = disable backups)
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1400,84 +1337,63 @@ FUNCTION le_result_t SetBufferBackupPeriod
  *         does not exist.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION uint32 GetBufferBackupPeriod
+uint32_t admin_GetBufferBackupPeriod
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Path within the /obs/ namespace.
+    const char* LE_NONNULL path
+        ///< [IN] Path within the /obs/ namespace.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a Boolean value.
- *
- * @return
- *      - LE_OK If setting default was successful.
- *      - LE_NO_MEMORY If could not set default due to lack of memory.
- *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
- *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetBooleanDefault
+void admin_SetBooleanDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    bool value IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    bool value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a numeric value.
- *
- * @return
- *      - LE_OK If setting default was successful.
- *      - LE_NO_MEMORY If could not set default due to lack of memory.
- *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
- *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetNumericDefault
+void admin_SetNumericDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    double value IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    double value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a string value.
- *
- * @return
- *      - LE_OK If setting default was successful.
- *      - LE_NO_MEMORY If could not set default due to lack of memory.
- *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch.
- *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetStringDefault
+void admin_SetStringDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string value[io.MAX_STRING_VALUE_LEN] IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    const char* LE_NONNULL value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set the default value of a resource to a JSON value.
- *
- * @return
- *      - LE_OK If setting default was successful.
- *      - LE_NO_MEMORY If could not set default due to lack of memory.
- *      - LE_BAD_PARAMETER If could not set default value due to type or unit mismatch or JSON is
- *             invalid.
- *      - LE_FAULT If setting default failed becasue of any other error.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetJsonDefault
+void admin_SetJsonDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string value[io.MAX_STRING_VALUE_LEN] IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    const char* LE_NONNULL value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1486,11 +1402,11 @@ FUNCTION le_result_t SetJsonDefault
  * @return true if there is a default value set, false if not.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION bool HasDefault
+bool admin_HasDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1499,11 +1415,11 @@ FUNCTION bool HasDefault
  * @return The data type, or IO_DATA_TYPE_TRIGGER if not set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION io.DataType GetDefaultDataType
+io_DataType_t admin_GetDefaultDataType
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1512,11 +1428,11 @@ FUNCTION io.DataType GetDefaultDataType
  * @return the default value, or false if not set or set to another data type.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION bool GetBooleanDefault
+bool admin_GetBooleanDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1525,11 +1441,11 @@ FUNCTION bool GetBooleanDefault
  * @return the default value, or NAN (not a number) if not set or set to another data type.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION double GetNumericDefault
+double admin_GetNumericDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1541,12 +1457,15 @@ FUNCTION double GetNumericDefault
  *  - LE_NOT_FOUND if the resource doesn't have a string default value set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t GetStringDefault
+le_result_t admin_GetStringDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string value[io.MAX_STRING_VALUE_LEN] OUT
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    char* value,
+        ///< [OUT]
+    size_t valueSize
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1560,96 +1479,90 @@ FUNCTION le_result_t GetStringDefault
  *  - LE_NOT_FOUND if the resource doesn't have a default value set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t GetJsonDefault
+le_result_t admin_GetJsonDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string value[io.MAX_STRING_VALUE_LEN] OUT
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    char* value,
+        ///< [OUT]
+    size_t valueSize
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Remove any default value on a given resource.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION RemoveDefault
+void admin_RemoveDefault
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set an override of Boolean type on a given resource.
  *
- * @return
- *      - LE_OK If setting override was successful.
- *      - LE_NO_MEMORY If could not set override value due to lack of memory.
- *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
- *      - LE_FAULT If any other error happened.
+ * @note Override will be ignored by an Input or Output resource if the override's data type
+ *       does not match the data type of the Input or Output.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetBooleanOverride
+void admin_SetBooleanOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    bool value IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    bool value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set an override of numeric type on a given resource.
  *
- * @return
- *      - LE_OK If setting override was successful.
- *      - LE_NO_MEMORY If could not set override value due to lack of memory.
- *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
- *      - LE_FAULT If any other error happened.
+ * @note Override will be ignored by an Input or Output resource if the override's data type
+ *       does not match the data type of the Input or Output.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetNumericOverride
+void admin_SetNumericOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    double value IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    double value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set an override of string type on a given resource.
  *
- * @return
- *      - LE_OK If setting override was successful.
- *      - LE_NO_MEMORY If could not set override value due to lack of memory.
- *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch.
- *      - LE_FAULT If any other error happened.
+ * @note Override will be ignored by an Input or Output resource if the override's data type
+ *       does not match the data type of the Input or Output.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetStringOverride
+void admin_SetStringOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string value[io.MAX_STRING_VALUE_LEN] IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    const char* LE_NONNULL value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Set an override of JSON type on a given resource.
  *
- * @return
- *      - LE_OK If setting override was successful.
- *      - LE_NO_MEMORY If could not set override value due to lack of memory.
- *      - LE_BAD_PARAMETER If could not set override value due to type or unit mismatch or JSON was
- *              invalid.
- *      - LE_FAULT If any other error happened.
+ * @note Override will be ignored by an Input or Output resource if the override's data type
+ *       does not match the data type of the Input or Output.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t SetJsonOverride
+void admin_SetJsonOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string value[io.MAX_STRING_VALUE_LEN] IN
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    const char* LE_NONNULL value
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1664,11 +1577,11 @@ FUNCTION le_result_t SetJsonOverride
  *       definitely be overridden.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION bool HasOverride
+bool admin_HasOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1677,11 +1590,11 @@ FUNCTION bool HasOverride
  * @return The data type, or IO_DATA_TYPE_TRIGGER if not set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION io.DataType GetOverrideDataType
+io_DataType_t admin_GetOverrideDataType
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1690,11 +1603,11 @@ FUNCTION io.DataType GetOverrideDataType
  * @return the override value, or false if not set or set to another data type.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION bool GetBooleanOverride
+bool admin_GetBooleanOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1703,11 +1616,11 @@ FUNCTION bool GetBooleanOverride
  * @return the override value, or NAN (not a number) if not set or set to another data type.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION double GetNumericOverride
+double admin_GetNumericOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1719,12 +1632,15 @@ FUNCTION double GetNumericOverride
  *  - LE_NOT_FOUND if the resource doesn't have a string override value set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t GetStringOverride
+le_result_t admin_GetStringOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string value[io.MAX_STRING_VALUE_LEN] OUT
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    char* value,
+        ///< [OUT]
+    size_t valueSize
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1738,23 +1654,26 @@ FUNCTION le_result_t GetStringOverride
  *  - LE_NOT_FOUND if the resource doesn't have an override value set.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t GetJsonOverride
+le_result_t admin_GetJsonOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string value[io.MAX_STRING_VALUE_LEN] OUT
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    char* value,
+        ///< [OUT]
+    size_t valueSize
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
  * Remove any override on a given resource.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION RemoveOverride
+void admin_RemoveOverride
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN  ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1766,12 +1685,15 @@ FUNCTION RemoveOverride
  *  - LE_NOT_FOUND if the resource doesn't have any children.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t GetFirstChild
+le_result_t admin_GetFirstChild
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string child[io.MAX_RESOURCE_PATH_LEN] OUT  ///< Absolute path of the first child resource.
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    char* child,
+        ///< [OUT] Absolute path of the first child resource.
+    size_t childSize
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1783,12 +1705,15 @@ FUNCTION le_result_t GetFirstChild
  *  - LE_NOT_FOUND if the resource is the last child in its parent's list of children.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION le_result_t GetNextSibling
+le_result_t admin_GetNextSibling
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    string sibling[io.MAX_RESOURCE_PATH_LEN] OUT  ///< Absolute path of the next sibling resource.
+    const char* LE_NONNULL path,
+        ///< [IN] Absolute path of the resource.
+    char* sibling,
+        ///< [OUT] Absolute path of the next sibling resource.
+    size_t siblingSize
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1797,11 +1722,11 @@ FUNCTION le_result_t GetNextSibling
  * @return The entry type. ADMIN_ENTRY_TYPE_NONE if there's no entry at the given path.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION EntryType GetEntryType
+admin_EntryType_t admin_GetEntryType
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1811,36 +1736,35 @@ FUNCTION EntryType GetEntryType
  * @return true if a mandatory output, false if it's an optional output or not an output at all.
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION bool IsMandatory
+bool admin_IsMandatory
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN ///< Absolute path of the resource.
+    const char* LE_NONNULL path
+        ///< [IN] Absolute path of the resource.
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
- * Register a handler, to be called back whenever a Resource is added or removed
+ * Add handler function for EVENT 'admin_ResourceTreeChange'
  */
 //--------------------------------------------------------------------------------------------------
-HANDLER ResourceTreeChangeHandler
+admin_ResourceTreeChangeHandlerRef_t admin_AddResourceTreeChangeHandler
 (
-    string path[io.MAX_RESOURCE_PATH_LEN] IN, ///< Absolute path of the resource.
-    EntryType entryType IN, ///< The type of the Resource (Input / Output / ...)
-    ResourceOperationType operation IN ///< Whether the Resource was added or Removed
+    admin_ResourceTreeChangeHandlerFunc_t callbackPtr,
+        ///< [IN]
+    void* contextPtr
+        ///< [IN]
 );
 
-
 //--------------------------------------------------------------------------------------------------
-/*
- * Causes the AddResourceChangeHandler() and RemoveResourceChangeHandler() functions
- * to be generated by the Legato build tools.
+/**
+ * Remove handler function for EVENT 'admin_ResourceTreeChange'
  */
 //--------------------------------------------------------------------------------------------------
-EVENT ResourceTreeChange
+void admin_RemoveResourceTreeChangeHandler
 (
-    ResourceTreeChangeHandler callback
+    admin_ResourceTreeChangeHandlerRef_t handlerRef
+        ///< [IN]
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1849,10 +1773,10 @@ EVENT ResourceTreeChange
  * This will result in call-backs to any handlers registered using io_AddUpdateStartEndHandler().
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION StartUpdate
+void admin_StartUpdate
 (
+    void
 );
-
 
 //--------------------------------------------------------------------------------------------------
 /**
@@ -1866,6 +1790,9 @@ FUNCTION StartUpdate
  * io_AddUpdateStartEndHandler().
  */
 //--------------------------------------------------------------------------------------------------
-FUNCTION EndUpdate
+void admin_EndUpdate
 (
+    void
 );
+
+#endif // ADMIN_INTERFACE_H_INCLUDE_GUARD

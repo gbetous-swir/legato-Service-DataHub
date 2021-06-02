@@ -760,8 +760,10 @@ le_result_t GetJsonSnapshotFormatter
     return LE_OK;
 }
 
+#ifndef UNIT_TEST
 /// Component initialisation.
 COMPONENT_INIT
 {
     // Do nothing.
 }
+#endif

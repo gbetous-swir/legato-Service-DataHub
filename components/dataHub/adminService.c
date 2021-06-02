@@ -2614,3 +2614,325 @@ void admin_EndUpdate
 
     res_EndUpdate();
 }
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Extract the application name from an absolute path.
+ * eg. "/app/foo/sensor/value" => "foo"
+ *
+ * @return
+ *  - LE_OK if successful.
+ *  - LE_BAD_PARAMETER if the path is not absolute.
+ *  - LE_OVERFLOW if appName buffer is not large enough to contain the application name.
+ */
+//--------------------------------------------------------------------------------------------------
+static le_result_t ExtractAppNameFromAbsolutePath
+(
+    const char* path,
+        ///< [IN] Absolute resource tree path.
+    char* appName,
+        ///< [OUT] The extracted application name.
+    size_t appNameSize
+        ///< [IN] Size of the appName buffer.
+)
+{
+    // Verify the path is absolute
+    if (strncmp(path, "/app/", strlen("/app/")))
+    {
+        LE_ERROR("Path '%s' is not absolute.", path);
+        return LE_BAD_PARAMETER;
+    }
+
+    // Skip "/app/"
+    size_t i = 5; // Index into path.
+
+    // Look for next slash
+    const char* terminatorPtr = strchrnul(path + i, '/');
+
+    // Compute the length of the entry name in this path element.
+    size_t nameLen = terminatorPtr - (path + i);
+
+    // Sanity check the length.
+    if (nameLen == 0)
+    {
+        LE_ERROR("Resource path element missing in path '%s'.", path);
+        return LE_BAD_PARAMETER;
+    }
+    if (nameLen >= appNameSize)
+    {
+        LE_ERROR("Resource path element too long in path '%s'.", path);
+        return LE_OVERFLOW;
+    }
+
+    // Copy the name out and null terminate it.
+    (void)strncpy(appName, path + i, nameLen);
+    appName[nameLen] = '\0';
+
+    return LE_OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Create an input resource, which is used to push data into the Data Hub.
+ *
+ * Does nothing if the resource already exists.
+ *
+ * @return
+ *  - LE_OK if successful.
+ *  - LE_DUPLICATE if a resource by that name exists but with different direction, type or units.
+ *  - LE_NO_MEMORY if the client is not permitted to create that many resources.
+ *  - LE_FAULT if the path is not absolute.
+ */
+//--------------------------------------------------------------------------------------------------
+le_result_t admin_CreateInput
+(
+    const char* path,
+        ///< [IN] Absolute resource tree path.
+    io_DataType_t dataType,
+        ///< [IN] The data type.
+    const char* LE_NONNULL units
+        ///< [IN] e.g., "degC" (see senml); "" = unspecified.
+)
+{
+    LE_DEBUG("'%s' <%s> '%s'.", path, hub_GetDataTypeName(dataType), units);
+
+    resTree_EntryRef_t resRef = resTree_FindEntryAtAbsolutePath(path);
+
+    // Check for another resource having the same name in the same namespace.
+    if (resRef != NULL)
+    {
+        switch (resTree_GetEntryType(resRef))
+        {
+            case ADMIN_ENTRY_TYPE_INPUT:
+
+                // Check data type and units to see if they match.
+                if (   (resTree_GetDataType(resRef) != dataType)
+                    || (strcmp(units, resTree_GetUnits(resRef)) != 0))
+                {
+                    return LE_DUPLICATE;
+                }
+
+                // The object already exists.  Nothing more needs to be done.
+                return LE_OK;
+
+            case ADMIN_ENTRY_TYPE_OUTPUT:
+            case ADMIN_ENTRY_TYPE_OBSERVATION:
+
+                // These conflict.
+                return LE_DUPLICATE;
+
+            case ADMIN_ENTRY_TYPE_NAMESPACE:
+            case ADMIN_ENTRY_TYPE_PLACEHOLDER:
+
+                // These can be upgraded to Input objects by resTree_CreateInput().
+                break;
+
+            case ADMIN_ENTRY_TYPE_NONE:
+
+                LE_FATAL("Unexpected entry type.");
+        }
+    }
+
+    // Get the "/app" namespace first.
+    resTree_EntryRef_t nsRef;
+    LE_ASSERT(resTree_GetEntry(resTree_GetRoot(), "app", &nsRef) == LE_OK);
+
+    // Extract the app name from absolute path.
+    char appName[HUB_MAX_ENTRY_NAME_BYTES];
+    if (LE_OK != ExtractAppNameFromAbsolutePath(path, appName, sizeof(appName)))
+    {
+        LE_ERROR("Failed to extract app name from abs path '%s'.", path);
+        return LE_FAULT;
+    }
+
+    LE_DEBUG("App name is '%s'.", appName);
+
+    // Now get the app's namespace under the /app namespace.
+    LE_ASSERT(resTree_GetEntry(nsRef, appName, &nsRef) == LE_OK);
+
+    // Create the Input resource. Need to convert absolute path to relative one.
+    le_result_t ret = resTree_CreateInput(nsRef, path + strlen("/app/") + strlen(appName) + strlen("/"), dataType, units);
+    if (ret < 0)
+    {
+        LE_ERROR("Failed to create Input '/app/%s/%s'.", resTree_GetEntryName(nsRef), path);
+        return LE_FAULT;
+    }
+
+    return LE_OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Create an output resource, which is used to receive data output from the Data Hub.
+ *
+ * Does nothing if the resource already exists.
+ *
+ * @return
+ *  - LE_OK if successful.
+ *  - LE_DUPLICATE if a resource by that name exists but with different direction, type or units.
+ *  - LE_NO_MEMORY if the client is not permitted to create that many resources.
+ */
+//--------------------------------------------------------------------------------------------------
+le_result_t admin_CreateOutput
+(
+    const char* path,
+        ///< [IN] Absolute resource tree path.
+    io_DataType_t dataType,
+        ///< [IN] The data type.
+    const char* LE_NONNULL units
+        ///< [IN] e.g., "degC" (see senml); "" = unspecified.
+)
+{
+    LE_DEBUG("'%s' <%s> '%s'.", path, hub_GetDataTypeName(dataType), units);
+
+    resTree_EntryRef_t resRef = resTree_FindEntryAtAbsolutePath(path);
+
+    if (resRef != NULL)
+    {
+        switch (resTree_GetEntryType(resRef))
+        {
+            case ADMIN_ENTRY_TYPE_OUTPUT:
+
+                // Check data type and units to see if they match.
+                if (   (resTree_GetDataType(resRef) != dataType)
+                    || (strcmp(units, resTree_GetUnits(resRef)) != 0))
+                {
+                    return LE_DUPLICATE;
+                }
+
+                // The object already exists.  Nothing more needs to be done.
+                return LE_OK;
+
+            case ADMIN_ENTRY_TYPE_INPUT:
+            case ADMIN_ENTRY_TYPE_OBSERVATION:
+
+                // These conflict.
+                return LE_DUPLICATE;
+
+            case ADMIN_ENTRY_TYPE_NAMESPACE:
+            case ADMIN_ENTRY_TYPE_PLACEHOLDER:
+
+                // These can be upgraded to Output objects by resTree_CreateOutput().
+                break;
+
+            case ADMIN_ENTRY_TYPE_NONE:
+
+                LE_FATAL("Unexpected entry type.");
+        }
+    }
+
+    // Get the "/app" namespace first.
+    resTree_EntryRef_t nsRef;
+    LE_ASSERT(resTree_GetEntry(resTree_GetRoot(), "app", &nsRef) == LE_OK);
+
+    // Extract the app name from absolute path.
+    char appName[HUB_MAX_ENTRY_NAME_BYTES];
+    if (LE_OK != ExtractAppNameFromAbsolutePath(path, appName, sizeof(appName)))
+    {
+        LE_ERROR("Failed to extract app name from abs path '%s'.", path);
+        return LE_FAULT;
+    }
+
+    LE_DEBUG("App name is '%s'.", appName);
+
+    // Now get the app's namespace under the /app namespace.
+    LE_ASSERT(resTree_GetEntry(nsRef, appName, &nsRef) == LE_OK);
+
+    // Create the Output resource. Need to convert absolute path to relative one.
+    le_result_t ret = resTree_CreateOutput(nsRef, path + strlen("/app/") + strlen(appName) + strlen("/"), dataType, units);
+    if (ret < 0)
+    {
+        LE_ERROR("Failed to create Output '/app/%s/%s'.", resTree_GetEntryName(nsRef), path);
+        return LE_FAULT;
+    }
+
+    return LE_OK;
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Delete a resource.
+ *
+ * Does nothing if the resource doesn't exist.
+ */
+//--------------------------------------------------------------------------------------------------
+void admin_DeleteResource
+(
+    const char* path
+        ///< [IN] Absolute resource tree path.
+)
+{
+    LE_DEBUG("'%s'", path);
+
+    // If the resource exists, delete it.
+    resTree_EntryRef_t resRef = resTree_FindEntryAtAbsolutePath(path);
+    if (resRef != NULL)
+    {
+        resTree_DeleteIO(resRef);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Set the example value for a JSON-type Input resource.
+ *
+ * Does nothing if the resource is not found, is not an input, or doesn't have a JSON type.
+ */
+//--------------------------------------------------------------------------------------------------
+void admin_SetJsonExample
+(
+    const char* path,
+        ///< [IN] Absolute resource tree path.
+    const char* example
+        ///< [IN] The example JSON value string.
+)
+{
+    resTree_EntryRef_t resRef = resTree_FindEntryAtAbsolutePath(path);
+    if (resRef == NULL)
+    {
+        LE_ERROR("Resource '%s' does not exist.", path);
+    }
+    else if (resTree_GetEntryType(resRef) != ADMIN_ENTRY_TYPE_INPUT)
+    {
+        LE_ERROR("Resource '%s' is not an input.", path);
+    }
+    else if (resTree_GetDataType(resRef) != IO_DATA_TYPE_JSON)
+    {
+        LE_ERROR("Resource '%s' does not have JSON data type.", path);
+    }
+    else
+    {
+        dataSample_Ref_t sampleRef = dataSample_CreateJson(0, example);
+
+        if (sampleRef != NULL)
+        {
+            resTree_SetJsonExample(resRef, sampleRef);
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+/**
+ * Mark an Output resource "optional".  (By default, they are marked "mandatory".)
+ */
+//--------------------------------------------------------------------------------------------------
+void admin_MarkOptional
+(
+    const char* path
+        ///< [IN] Absolute resource tree path.
+)
+{
+    resTree_EntryRef_t resRef = resTree_FindEntryAtAbsolutePath(path);
+    if (resRef == NULL)
+    {
+        LE_ERROR("Attempt to mark non-existent resource optional at '%s'.", path);
+    }
+    else if (resTree_GetEntryType(resRef) != ADMIN_ENTRY_TYPE_OUTPUT)
+    {
+        LE_ERROR("Attempt to mark non-Output resource optional at '%s'.", path);
+    }
+    else
+    {
+        resTree_MarkOptional(resRef);
+    }
+}
