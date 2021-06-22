@@ -24,7 +24,11 @@ requires:
 {
     api:
     {
+#if ${MK_CONFIG_PERIODIC_SENSOR_ABSOLUTE} = y
+        dhubIO = admin.api
+#else
         dhubIO = io.api
+#endif
     }
 }
 

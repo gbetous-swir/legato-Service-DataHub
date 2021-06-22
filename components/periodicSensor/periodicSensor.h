@@ -33,7 +33,12 @@
  * Maximum number of bytes in a sensor name (including null terminator).
  */
 //--------------------------------------------------------------------------------------------------
+#ifdef MK_CONFIG_PERIODIC_SENSOR_ABSOLUTE
+#define PSENSOR_RESERVED_MAX_BYTES   7   // Reserved bytes for suffix, based on strlen("trigger")
+#define PSENSOR_MAX_NAME_BYTES  (IO_MAX_RESOURCE_PATH_LEN - PSENSOR_RESERVED_MAX_BYTES)
+#else
 #define PSENSOR_MAX_NAME_BYTES  32
+#endif
 
 
 //--------------------------------------------------------------------------------------------------
@@ -59,7 +64,7 @@ typedef struct psensor* psensor_Ref_t;
 LE_SHARED psensor_Ref_t psensor_Create
 (
     const char* name,   ///< Name of the periodic sensor, or "" if the app name is sufficient.
-    dhubIO_DataType_t dataType,
+    io_DataType_t dataType,
     const char* units,
     void (*sampleFunc)(psensor_Ref_t ref,
                        void *context), ///< Sample function to be called back periodically.

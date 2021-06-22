@@ -219,7 +219,7 @@ static void BuildResourcePath
 psensor_Ref_t psensor_Create
 (
     const char* name,   ///< Name of the periodic sensor, or "" if the app name is sufficient.
-    dhubIO_DataType_t dataType,
+    io_DataType_t dataType,
     const char* units,
     void (*sampleFunc)(psensor_Ref_t ref,
                        void *context), ///< Sample function to be called back periodically.
@@ -246,7 +246,7 @@ psensor_Ref_t psensor_Create
     }
 
     // Create the Data Hub resources "value", "enable", "period", and "trigger" for this sensor.
-    char path[DHUBIO_MAX_RESOURCE_PATH_LEN];
+    char path[IO_MAX_RESOURCE_PATH_LEN];
     BuildResourcePath(path, sizeof(path), sensorPtr, "value");
     le_result_t result = dhubIO_CreateInput(path, dataType, units);
     if (result != LE_OK)
@@ -255,7 +255,7 @@ psensor_Ref_t psensor_Create
     }
 
     BuildResourcePath(path, sizeof(path), sensorPtr, "enable");
-    result = dhubIO_CreateOutput(path, DHUBIO_DATA_TYPE_BOOLEAN, "");
+    result = dhubIO_CreateOutput(path, IO_DATA_TYPE_BOOLEAN, "");
     if (result != LE_OK)
     {
         LE_FATAL("Failed to create Data Hub Output '%s' (%s).", path, LE_RESULT_TXT(result));
@@ -264,7 +264,7 @@ psensor_Ref_t psensor_Create
 
 
     BuildResourcePath(path, sizeof(path), sensorPtr, "period");
-    result = dhubIO_CreateOutput(path, DHUBIO_DATA_TYPE_NUMERIC, "s");
+    result = dhubIO_CreateOutput(path, IO_DATA_TYPE_NUMERIC, "s");
     if (result != LE_OK)
     {
         LE_FATAL("Failed to create Data Hub Output '%s' (%s).", path, LE_RESULT_TXT(result));
@@ -272,7 +272,7 @@ psensor_Ref_t psensor_Create
     sensorPtr->periodHandlerRef = dhubIO_AddNumericPushHandler(path, HandlePeriodPush, sensorPtr);
 
     BuildResourcePath(path, sizeof(path), sensorPtr, "trigger");
-    result = dhubIO_CreateOutput(path, DHUBIO_DATA_TYPE_TRIGGER, "");
+    result = dhubIO_CreateOutput(path, IO_DATA_TYPE_TRIGGER, "");
     if (result != LE_OK)
     {
         LE_FATAL("Failed to create Data Hub Output '%s' (%s).", path, LE_RESULT_TXT(result));
@@ -306,12 +306,12 @@ psensor_Ref_t psensor_CreateJson
 //--------------------------------------------------------------------------------------------------
 {
     psensor_Ref_t ref = psensor_Create(name,
-                                       DHUBIO_DATA_TYPE_JSON,
+                                       IO_DATA_TYPE_JSON,
                                        "", // units
                                        sampleFunc,
                                        sampleFuncContext);
 
-    char path[DHUBIO_MAX_RESOURCE_PATH_LEN];
+    char path[IO_MAX_RESOURCE_PATH_LEN];
     BuildResourcePath(path, sizeof(path), ref, "value");
     dhubIO_SetJsonExample(path, jsonExample);
 
@@ -331,7 +331,7 @@ void psensor_Destroy
 //--------------------------------------------------------------------------------------------------
 {
     Sensor_t* sensorPtr;
-    char path[DHUBIO_MAX_RESOURCE_PATH_LEN];
+    char path[IO_MAX_RESOURCE_PATH_LEN];
 
     LE_ASSERT(NULL != ref);
 
@@ -382,7 +382,7 @@ void psensor_PushBoolean
 {
     Sensor_t* sensorPtr = ref;
 
-    char path[DHUBIO_MAX_RESOURCE_PATH_LEN];
+    char path[IO_MAX_RESOURCE_PATH_LEN];
     LE_ASSERT(snprintf(path, sizeof(path), "%s/value", sensorPtr->name) < (int) sizeof(path));
 
     dhubIO_PushBoolean(path, timestamp, value);
@@ -404,7 +404,7 @@ void psensor_PushNumeric
 {
     Sensor_t* sensorPtr = ref;
 
-    char path[DHUBIO_MAX_RESOURCE_PATH_LEN];
+    char path[IO_MAX_RESOURCE_PATH_LEN];
     LE_ASSERT(snprintf(path, sizeof(path), "%s/value", sensorPtr->name) < (int) sizeof(path));
 
     dhubIO_PushNumeric(path, timestamp, value);
@@ -426,7 +426,7 @@ void psensor_PushString
 {
     Sensor_t* sensorPtr = ref;
 
-    char path[DHUBIO_MAX_RESOURCE_PATH_LEN];
+    char path[IO_MAX_RESOURCE_PATH_LEN];
     LE_ASSERT(snprintf(path, sizeof(path), "%s/value", sensorPtr->name) < (int) sizeof(path));
 
     dhubIO_PushString(path, timestamp, value);
@@ -448,7 +448,7 @@ void psensor_PushJson
 {
     Sensor_t* sensorPtr = ref;
 
-    char path[DHUBIO_MAX_RESOURCE_PATH_LEN];
+    char path[IO_MAX_RESOURCE_PATH_LEN];
     LE_ASSERT(snprintf(path, sizeof(path), "%s/value", sensorPtr->name) < (int) sizeof(path));
 
     dhubIO_PushJson(path, timestamp, value);
