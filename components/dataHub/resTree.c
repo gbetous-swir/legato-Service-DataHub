@@ -707,7 +707,7 @@ le_result_t resTree_GetResource
 )
 //--------------------------------------------------------------------------------------------------
 {
-    resTree_EntryRef_t entryRef;
+    resTree_EntryRef_t entryRef = NULL;
     le_result_t ret = LE_OK;
     bool createdEntry = false;
 
